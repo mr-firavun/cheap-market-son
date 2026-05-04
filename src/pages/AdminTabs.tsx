@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Package, Users, TrendingUp, DollarSign, ArrowUpRight,
   MessageSquare, Settings, Search, Eye, UserCog, Check, X,
   Loader, ToggleLeft, ToggleRight, Wallet, TrendingDown,
   BarChart3, CalendarDays, Hash, Link as LinkIcon,
-  Image, Plus, Copy, AlertTriangle, Globe, ChevronRight,
+  Image, Plus, Copy, AlertTriangle, Globe, ChevronRight, Trash2, Upload,
 } from 'lucide-react';
 import { supabase, Product, Profile, Transaction, Investment, SupportMessage } from '../lib/supabase';
 
@@ -82,6 +82,9 @@ export default function AdminTabs({
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_PRODUCT);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [deletingProduct, setDeletingProduct] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editBalance, setEditBalance] = useState<{ userId: string; value: string } | null>(null);
   const [savingBalance, setSavingBalance] = useState(false);
   const [openThread, setOpenThread] = useState<string | null>(null);
@@ -125,6 +128,25 @@ export default function AdminTabs({
   async function toggleProduct(id: string, active: boolean) {
     await supabase.from('products').update({ is_active: !active }).eq('id', id);
     setProducts((prev) => prev.map((pr) => pr.id === id ? { ...pr, is_active: !active } : pr));
+  }
+
+  async function uploadProductImage(file: File) {
+    setUploadingImage(true);
+    const ext = file.name.split('.').pop();
+    const filename = `product-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('product-images').upload(filename, file, { upsert: true });
+    if (!error) {
+      const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(filename);
+      setForm((f) => ({ ...f, image_url: publicUrl }));
+    }
+    setUploadingImage(false);
+  }
+
+  async function deleteProduct(id: string) {
+    setDeletingProduct(id);
+    await supabase.from('products').delete().eq('id', id);
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    setDeletingProduct(null);
   }
 
   function startEdit(product: Product) {
@@ -287,12 +309,21 @@ export default function AdminTabs({
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                <span className="flex items-center gap-1.5"><Image size={12} />Fotograf URL</span>
+                <span className="flex items-center gap-1.5"><Image size={12} />Urun Fotografı</span>
               </label>
-              <input type="url" value={form.image_url}
-                onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
-                placeholder="https://images.pexels.com/..."
-                className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/50" />
+              <div className="flex gap-2">
+                <input type="url" value={form.image_url}
+                  onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
+                  placeholder="https://... veya bilgisayardan yukle"
+                  className="flex-1 bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/50" />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadProductImage(f); }} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-200 text-sm rounded-lg transition-all shrink-0">
+                  {uploadingImage ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {uploadingImage ? 'Yukleniyor...' : 'PC\'den Sec'}
+                </button>
+              </div>
               {form.image_url && (
                 <div className="mt-2 rounded-lg overflow-hidden w-24 h-16 border border-gray-700">
                   <img src={form.image_url} alt="preview" className="w-full h-full object-cover" />
@@ -346,6 +377,10 @@ export default function AdminTabs({
               </button>
               <button onClick={() => startEdit(p)} className="p-2 text-gray-500 hover:text-amber-400 hover:bg-gray-800 rounded-lg transition-all">
                 <Package size={14} />
+              </button>
+              <button onClick={() => deleteProduct(p.id)} disabled={deletingProduct === p.id}
+                className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50">
+                {deletingProduct === p.id ? <Loader size={14} className="animate-spin" /> : <Trash2 size={14} />}
               </button>
             </div>
           </div>

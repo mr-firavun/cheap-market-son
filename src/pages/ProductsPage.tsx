@@ -10,7 +10,7 @@ type Props = {
   onNavigate: (page: 'home' | 'products' | 'dashboard' | 'auth' | 'admin') => void;
 };
 
-const PRODUCT_IMAGES = [
+const FALLBACK_IMAGES = [
   'https://images.pexels.com/photos/393047/pexels-photo-393047.jpeg?auto=compress&cs=tinysrgb&w=600',
   'https://images.pexels.com/photos/934070/pexels-photo-934070.jpeg?auto=compress&cs=tinysrgb&w=600',
   'https://images.pexels.com/photos/18105/pexels-photo.jpg?auto=compress&cs=tinysrgb&w=600',
@@ -212,7 +212,8 @@ export default function ProductsPage({ onNavigate }: Props) {
                 ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {activeInvestments.map((inv) => {
-                    const img = PRODUCT_IMAGES[products.findIndex(p => p.id === inv.product_id) % PRODUCT_IMAGES.length] ?? PRODUCT_IMAGES[0];
+                    const idx = products.findIndex(p => p.id === inv.product_id);
+                    const img = inv.products?.image_url || FALLBACK_IMAGES[idx >= 0 ? idx % FALLBACK_IMAGES.length : 0];
 
                     return (
                       <div
@@ -285,7 +286,7 @@ export default function ProductsPage({ onNavigate }: Props) {
                   const isBuying = buying === product.id;
                   const fb = feedback?.id === product.id ? feedback : null;
                   const badge = tierLabel(product.profit_rate);
-                  const img = PRODUCT_IMAGES[idx % PRODUCT_IMAGES.length];
+                  const img = product.image_url || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
                   const totalReturn = product.price + (product.price * product.profit_rate) / 100;
 
                   return (
