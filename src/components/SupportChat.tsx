@@ -192,8 +192,8 @@ export default function SupportChat() {
         </div>
       )}
 
-      {/* WhatsApp floating button — always visible when link is configured */}
-      {wpLink && (
+      {/* WhatsApp floating button — always visible */}
+      {wpLink ? (
         <a
           href={wpLink}
           target="_blank"
@@ -203,6 +203,13 @@ export default function SupportChat() {
         >
           <WhatsAppIcon className="w-7 h-7 text-white" />
         </a>
+      ) : (
+        <div
+          title="WhatsApp support coming soon"
+          className="w-14 h-14 rounded-2xl bg-emerald-500 shadow-2xl shadow-emerald-500/40 flex items-center justify-center opacity-80"
+        >
+          <WhatsAppIcon className="w-7 h-7 text-white" />
+        </div>
       )}
 
       {/* Support chat button — always visible */}
