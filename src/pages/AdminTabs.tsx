@@ -4,7 +4,7 @@ import {
   MessageSquare, Settings, Search, Eye, UserCog, Check, X,
   Loader, ToggleLeft, ToggleRight, Wallet, TrendingDown,
   BarChart3, CalendarDays, Hash, Link as LinkIcon,
-  Image, Plus, Copy, AlertTriangle, Globe, ChevronRight, Trash2, Upload,
+  Image, Plus, Copy, AlertTriangle, AlertCircle, Globe, ChevronRight, Trash2, Upload,
 } from 'lucide-react';
 import { supabase, Product, Profile, Transaction, Investment, SupportMessage } from '../lib/supabase';
 
@@ -700,16 +700,21 @@ export default function AdminTabs({
               <div className="text-xs text-gray-500 mt-0.5">Bakiye: <span className="text-gray-300">${Number(tx.user_balance).toFixed(2)}</span></div>
             </div>
           </div>
-          {tx.withdrawal_address && (
-            <div className="flex items-center gap-2 bg-gray-800/80 border border-gray-700 rounded-xl px-4 py-3 mb-4">
-              <Wallet size={14} className="text-sky-400 shrink-0" />
+          {tx.withdrawal_address ? (
+            <div className="flex items-center gap-3 bg-sky-950/40 border border-sky-500/30 rounded-xl px-4 py-3 mb-4">
+              <Wallet size={15} className="text-sky-400 shrink-0" />
               <div className="flex-1 min-w-0">
-                <div className="text-xs text-gray-500 mb-0.5">USDT TRC20 Hedef Adresi</div>
-                <div className="text-sm font-mono text-sky-300 break-all">{tx.withdrawal_address}</div>
+                <div className="text-xs text-sky-500/80 font-medium mb-0.5">USDT TRC20 Odeme Adresi</div>
+                <div className="text-sm font-mono text-sky-300 break-all select-all">{tx.withdrawal_address}</div>
               </div>
-              <button onClick={() => copyAddress(tx.withdrawal_address!)} className="shrink-0 p-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-white transition-all">
-                {copiedAddr === tx.withdrawal_address ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+              <button onClick={() => copyAddress(tx.withdrawal_address!)} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 hover:text-sky-300 border border-sky-500/30 text-xs font-medium transition-all">
+                {copiedAddr === tx.withdrawal_address ? <><Check size={12} className="text-emerald-400" /> Kopyalandi</> : <><Copy size={12} /> Kopyala</>}
               </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-4">
+              <AlertCircle size={14} className="text-red-400 shrink-0" />
+              <span className="text-xs text-red-400">Bu talep icin cekim adresi girilmemis.</span>
             </div>
           )}
           <div className="flex gap-3">

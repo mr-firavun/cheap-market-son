@@ -278,7 +278,7 @@ export default function DashboardPage({ onNavigate }: Props) {
     if (!isValidTRC20(trimmedAddr)) { setWithdrawError('Invalid address. A TRC20 address must start with "T" and be 34 characters long.'); return; }
     const amount = parseFloat(withdrawAmount);
     if (isNaN(amount) || amount <= 0) { setWithdrawError('Please enter a valid amount.'); return; }
-    if (amount < 10) { setWithdrawError('Minimum withdrawal amount is $10 USDT.'); return; }
+    if (amount < 50) { setWithdrawError('Minimum withdrawal amount is $50 USDT.'); return; }
     if (amount > profile.balance) { setWithdrawError('Insufficient balance.'); return; }
 
     setWithdrawing(true);
@@ -419,7 +419,7 @@ export default function DashboardPage({ onNavigate }: Props) {
                 {copied ? 'Copied!' : 'Copy Address'}
               </button>
             </div>
-            <div className="text-xs text-amber-500/70 shrink-0">Min. $10 USDT</div>
+            <div className="text-xs text-amber-500/70 shrink-0">Min. $50 USDT</div>
           </div>
         </div>
 
@@ -544,9 +544,12 @@ export default function DashboardPage({ onNavigate }: Props) {
 
               {/* Wallet address input */}
               <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">Your USDT TRC20 Withdrawal Address</label>
+                <label className="block text-xs font-medium text-gray-400 mb-1">USDT TRC20 Cekim Adresiniz</label>
+                <p className="text-xs text-gray-500 mb-2 leading-relaxed">
+                  Lutfen USDT'yi gondermemizi istediginiz TRC20 cuzdan adresinizi yapistirin. Bu adres admin tarafindan goruntur ve odeme bu adrese gonderilecektir.
+                </p>
                 <input type="text" value={walletInput} onChange={(e) => { setWalletInput(e.target.value); setWalletError(''); }}
-                  placeholder="T..."
+                  placeholder="T... (TRC20 adresi buraya yapistirin)"
                   className={`w-full bg-gray-800 border text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none transition-colors ${walletError ? 'border-red-500/60' : 'border-gray-700 focus:border-rose-500/50'}`} />
                 {walletError && <div className="flex items-start gap-1.5 mt-1.5"><AlertCircle size={12} className="text-red-400 mt-0.5 shrink-0" /><p className="text-xs text-red-400">{walletError}</p></div>}
               </div>
@@ -557,7 +560,7 @@ export default function DashboardPage({ onNavigate }: Props) {
                 <div className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-lg px-3">
                   <span className="text-gray-500 text-sm">$</span>
                   <input type="number" value={withdrawAmount} onChange={(e) => { setWithdrawAmount(e.target.value); setWithdrawError(''); }}
-                    placeholder="0.00" min="10"
+                    placeholder="0.00" min="50"
                     className="flex-1 bg-transparent text-white py-2.5 text-sm focus:outline-none" />
                   <span className="text-gray-500 text-xs">USDT</span>
                 </div>
@@ -568,7 +571,7 @@ export default function DashboardPage({ onNavigate }: Props) {
                 {withdrawing ? <Loader size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
                 Submit Withdrawal Request
               </button>
-              <p className="text-xs text-gray-600 mt-2 text-center">Balance: <span className="text-gray-400">${Number(profile?.balance ?? 0).toFixed(2)}</span> &bull; Min. $10</p>
+              <p className="text-xs text-gray-600 mt-2 text-center">Bakiye: <span className="text-gray-400">${Number(profile?.balance ?? 0).toFixed(2)}</span> &bull; Min. $50 USDT</p>
             </div>
           </div>
 
