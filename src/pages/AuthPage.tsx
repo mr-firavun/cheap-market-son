@@ -79,6 +79,7 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
 
     if (mode === 'login') {
       const { error } = await signIn(form.email, form.password);
+      setLoading(false);
       if (error) {
         setError('Incorrect email or password.');
       } else {
@@ -88,13 +89,13 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
       if (!form.fullName.trim()) { setError('Full name is required.'); setLoading(false); return; }
       if (form.password.length < 6) { setError('Password must be at least 6 characters.'); setLoading(false); return; }
       const { error } = await signUp(form.email, form.password, form.fullName, form.referralCode || undefined);
+      setLoading(false);
       if (error) {
         setError('Registration failed. This email may already be in use.');
       } else {
         onNavigate('dashboard');
       }
     }
-    setLoading(false);
   }
 
   async function handleForgotSubmit(e: React.FormEvent) {

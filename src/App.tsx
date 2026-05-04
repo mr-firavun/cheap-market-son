@@ -24,8 +24,9 @@ function AppContent() {
       .eq('key', 'maintenance_mode')
       .maybeSingle()
       .then(({ data }) => {
-        setMaintenance(data?.value === 'true');
-      });
+        setMaintenance(data?.value === 'true' ? true : false);
+      })
+      .catch(() => setMaintenance(false));
   }, []);
 
   useEffect(() => {
@@ -46,7 +47,7 @@ function AppContent() {
     setPage(p);
   }
 
-  if (loading || maintenance === null) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
