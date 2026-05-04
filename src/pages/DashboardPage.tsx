@@ -544,12 +544,9 @@ export default function DashboardPage({ onNavigate }: Props) {
 
               {/* Wallet address input */}
               <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-400 mb-1">USDT TRC20 Cekim Adresiniz</label>
-                <p className="text-xs text-gray-500 mb-2 leading-relaxed">
-                  Lutfen USDT'yi gondermemizi istediginiz TRC20 cuzdan adresinizi yapistirin. Bu adres admin tarafindan goruntur ve odeme bu adrese gonderilecektir.
-                </p>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Your USDT TRC20 Withdrawal Address</label>
                 <input type="text" value={walletInput} onChange={(e) => { setWalletInput(e.target.value); setWalletError(''); }}
-                  placeholder="T... (TRC20 adresi buraya yapistirin)"
+                  placeholder="Paste your TRC20 address here (starts with T...)"
                   className={`w-full bg-gray-800 border text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none transition-colors ${walletError ? 'border-red-500/60' : 'border-gray-700 focus:border-rose-500/50'}`} />
                 {walletError && <div className="flex items-start gap-1.5 mt-1.5"><AlertCircle size={12} className="text-red-400 mt-0.5 shrink-0" /><p className="text-xs text-red-400">{walletError}</p></div>}
               </div>
@@ -571,7 +568,7 @@ export default function DashboardPage({ onNavigate }: Props) {
                 {withdrawing ? <Loader size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
                 Submit Withdrawal Request
               </button>
-              <p className="text-xs text-gray-600 mt-2 text-center">Bakiye: <span className="text-gray-400">${Number(profile?.balance ?? 0).toFixed(2)}</span> &bull; Min. $50 USDT</p>
+              <p className="text-xs text-gray-600 mt-2 text-center">Balance: <span className="text-gray-400">${Number(profile?.balance ?? 0).toFixed(2)}</span> &bull; Min. $50 USDT</p>
             </div>
           </div>
 
