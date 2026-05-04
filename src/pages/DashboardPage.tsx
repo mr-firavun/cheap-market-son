@@ -273,15 +273,17 @@ export default function DashboardPage({ onNavigate }: Props) {
   async function requestWithdrawal() {
     if (!user || !profile) return;
     setWithdrawError('');
+    const trimmedAddr = walletInput.trim();
+    if (!trimmedAddr) { setWithdrawError('Please enter your USDT TRC20 withdrawal address.'); return; }
+    if (!isValidTRC20(trimmedAddr)) { setWithdrawError('Invalid address. A TRC20 address must start with "T" and be 34 characters long.'); return; }
     const amount = parseFloat(withdrawAmount);
     if (isNaN(amount) || amount <= 0) { setWithdrawError('Please enter a valid amount.'); return; }
-    if (amount > profile.balance) { setWithdrawError('Insufficient balance.'); return; }
-    if (!profile.wallet_address) { setWithdrawError('Please save your USDT TRC20 address first.'); return; }
     if (amount < 10) { setWithdrawError('Minimum withdrawal amount is $10 USDT.'); return; }
+    if (amount > profile.balance) { setWithdrawError('Insufficient balance.'); return; }
 
     setWithdrawing(true);
-    await supabase.from('profiles').update({ balance: profile.balance - amount }).eq('id', user.id);
-    await supabase.from('transactions').insert({ user_id: user.id, type: 'withdrawal', amount, status: 'pending', description: 'Withdrawal request', withdrawal_address: profile.wallet_address });
+    await supabase.from('profiles').update({ balance: profile.balance - amount, wallet_address: trimmedAddr }).eq('id', user.id);
+    await supabase.from('transactions').insert({ user_id: user.id, type: 'withdrawal', amount, status: 'pending', description: 'Withdrawal request', withdrawal_address: trimmedAddr });
     await refreshProfile();
     const { data: txData } = await supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(60);
     if (txData) setTransactions(txData as Transaction[]);
@@ -393,6 +395,34 @@ export default function DashboardPage({ onNavigate }: Props) {
           )}
         </div>
 
+        {/* Deposit Banner */}
+        <div className="bg-gray-900/70 border border-emerald-500/20 rounded-2xl p-5 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <ArrowDownLeft size={18} className="text-emerald-400" />
+              </div>
+              <div>
+                <div className="font-semibold text-sm">Deposit Balance</div>
+                <div className="text-xs text-gray-500">Send USDT to the address below to top up your account</div>
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 min-h-[42px] flex items-center">
+                {depositAddress
+                  ? <span className="text-xs text-gray-300 font-mono break-all">{depositAddress}</span>
+                  : <span className="text-xs text-gray-600 italic">Address not configured yet</span>}
+              </div>
+              <button onClick={copyAddr} disabled={!depositAddress}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all shrink-0 disabled:opacity-40 ${copied ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'}`}>
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? 'Copied!' : 'Copy Address'}
+              </button>
+            </div>
+            <div className="text-xs text-amber-500/70 shrink-0">Min. $10 USDT</div>
+          </div>
+        </div>
+
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
@@ -445,27 +475,7 @@ export default function DashboardPage({ onNavigate }: Props) {
             </div>
 
             {/* Top cards */}
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Deposit */}
-              <div className="bg-gray-900/70 border border-gray-800 rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <ArrowDownLeft size={16} className="text-emerald-400" />
-                  <span className="font-semibold text-sm">Deposit Balance (USDT TRC20)</span>
-                </div>
-                <p className="text-xs text-gray-500 mb-3 leading-relaxed">Send USDT to the TRC20 address below.</p>
-                <div className="bg-gray-800 rounded-lg p-3 mb-3 min-h-[44px] flex items-center">
-                  {depositAddress
-                    ? <div className="text-xs text-gray-400 font-mono break-all">{depositAddress}</div>
-                    : <div className="text-xs text-gray-600 italic">Address not configured yet</div>}
-                </div>
-                <button onClick={copyAddr} disabled={!depositAddress}
-                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-40 ${copied ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700'}`}>
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                  {copied ? 'Copied!' : 'Copy Address'}
-                </button>
-                <p className="text-xs text-amber-500/70 mt-3">Minimum deposit: $10 USDT</p>
-              </div>
-
+            <div className="grid lg:grid-cols-2 gap-6">
               {/* Referral */}
               <div className="bg-gray-900/70 border border-gray-800 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
@@ -505,63 +515,60 @@ export default function DashboardPage({ onNavigate }: Props) {
               </div>
             </div>
 
-            {/* Wallet + Withdrawal */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="bg-gray-900/70 border border-gray-800 rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <Wallet size={16} className="text-amber-400" />
-                  <span className="font-semibold text-sm">My USDT TRC20 Address</span>
+            {/* Withdrawal */}
+            <div className="bg-gray-900/70 border border-gray-800 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <ArrowUpRight size={16} className="text-rose-400" />
+                <span className="font-semibold text-sm">Withdraw</span>
+              </div>
+              <p className="text-xs text-gray-500 mb-4 leading-relaxed">Enter your USDT TRC20 address and the amount you want to withdraw.</p>
+
+              {pendingWithdrawals.length > 0 && (
+                <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-3">
+                  <Clock size={13} className="text-amber-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-300">You have {pendingWithdrawals.length} pending withdrawal request(s).</p>
                 </div>
-                <p className="text-xs text-gray-500 mb-3 leading-relaxed">Enter your TRC20 wallet address for withdrawals.</p>
+              )}
+              {withdrawSuccess && (
+                <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 mb-3">
+                  <Check size={13} className="text-emerald-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-emerald-300">Withdrawal request submitted.</p>
+                </div>
+              )}
+              {withdrawError && (
+                <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-3">
+                  <AlertCircle size={13} className="text-red-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-red-300">{withdrawError}</p>
+                </div>
+              )}
+
+              {/* Wallet address input */}
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Your USDT TRC20 Withdrawal Address</label>
                 <input type="text" value={walletInput} onChange={(e) => { setWalletInput(e.target.value); setWalletError(''); }}
-                  placeholder="T..." className={`w-full bg-gray-800 border text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm font-mono mb-2 focus:outline-none transition-colors ${walletError ? 'border-red-500/60' : 'border-gray-700 focus:border-amber-500/50'}`} />
-                {walletError && <div className="flex items-start gap-1.5 mb-3"><AlertCircle size={12} className="text-red-400 mt-0.5 shrink-0" /><p className="text-xs text-red-400">{walletError}</p></div>}
-                <button onClick={saveWalletAddress} disabled={savingWallet || !walletInput.trim()}
-                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-40 ${walletSaved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500 hover:bg-amber-400 text-gray-950'}`}>
-                  {savingWallet ? <Loader size={14} className="animate-spin" /> : walletSaved ? <Check size={14} /> : <Save size={14} />}
-                  {walletSaved ? 'Saved!' : 'Save Address'}
-                </button>
+                  placeholder="T..."
+                  className={`w-full bg-gray-800 border text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none transition-colors ${walletError ? 'border-red-500/60' : 'border-gray-700 focus:border-rose-500/50'}`} />
+                {walletError && <div className="flex items-start gap-1.5 mt-1.5"><AlertCircle size={12} className="text-red-400 mt-0.5 shrink-0" /><p className="text-xs text-red-400">{walletError}</p></div>}
               </div>
 
-              <div className="bg-gray-900/70 border border-gray-800 rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <ArrowUpRight size={16} className="text-rose-400" />
-                  <span className="font-semibold text-sm">Withdraw</span>
-                </div>
-                <p className="text-xs text-gray-500 mb-3 leading-relaxed">Submit a USDT withdrawal request from your balance.</p>
-                {pendingWithdrawals.length > 0 && (
-                  <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-3">
-                    <Clock size={13} className="text-amber-400 mt-0.5 shrink-0" />
-                    <p className="text-xs text-amber-300">You have {pendingWithdrawals.length} pending withdrawal request(s).</p>
-                  </div>
-                )}
-                {withdrawSuccess && (
-                  <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 mb-3">
-                    <Check size={13} className="text-emerald-400 mt-0.5 shrink-0" />
-                    <p className="text-xs text-emerald-300">Withdrawal request submitted.</p>
-                  </div>
-                )}
-                {withdrawError && (
-                  <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-3">
-                    <AlertCircle size={13} className="text-red-400 mt-0.5 shrink-0" />
-                    <p className="text-xs text-red-300">{withdrawError}</p>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-lg px-3 mb-3">
+              {/* Amount input */}
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Amount</label>
+                <div className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-lg px-3">
                   <span className="text-gray-500 text-sm">$</span>
                   <input type="number" value={withdrawAmount} onChange={(e) => { setWithdrawAmount(e.target.value); setWithdrawError(''); }}
                     placeholder="0.00" min="10"
                     className="flex-1 bg-transparent text-white py-2.5 text-sm focus:outline-none" />
                   <span className="text-gray-500 text-xs">USDT</span>
                 </div>
-                {!profile?.wallet_address && <p className="text-xs text-amber-500/80 mb-3">Save your TRC20 address before withdrawing.</p>}
-                <button onClick={requestWithdrawal} disabled={withdrawing || !withdrawAmount || !profile?.wallet_address}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-rose-500/80 hover:bg-rose-500 disabled:opacity-40 text-white rounded-lg text-sm font-semibold transition-all">
-                  {withdrawing ? <Loader size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
-                  Submit Withdrawal Request
-                </button>
-                <p className="text-xs text-gray-600 mt-2 text-center">Balance: <span className="text-gray-400">${Number(profile?.balance ?? 0).toFixed(2)}</span> &bull; Min. $10</p>
               </div>
+
+              <button onClick={requestWithdrawal} disabled={withdrawing || !withdrawAmount || !walletInput.trim()}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-rose-500/80 hover:bg-rose-500 disabled:opacity-40 text-white rounded-lg text-sm font-semibold transition-all">
+                {withdrawing ? <Loader size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
+                Submit Withdrawal Request
+              </button>
+              <p className="text-xs text-gray-600 mt-2 text-center">Balance: <span className="text-gray-400">${Number(profile?.balance ?? 0).toFixed(2)}</span> &bull; Min. $10</p>
             </div>
           </div>
 
