@@ -83,6 +83,7 @@ export default function AdminTabs({
   const [form, setForm] = useState(EMPTY_PRODUCT);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editBalance, setEditBalance] = useState<{ userId: string; value: string } | null>(null);
@@ -110,10 +111,17 @@ export default function AdminTabs({
   async function saveProduct() {
     if (!form.name || !form.price || !form.profit_rate || !form.duration_days) return;
     setSaving(true);
+    let finalImageUrl = form.image_url;
+    if (pendingFile) {
+      const uploaded = await uploadPendingFile();
+      if (uploaded) finalImageUrl = uploaded;
+      else if (finalImageUrl.startsWith('data:')) finalImageUrl = '';
+      setPendingFile(null);
+    }
     const payload = {
       name: form.name, description: form.description,
       price: parseFloat(form.price), profit_rate: parseFloat(form.profit_rate),
-      duration_days: parseInt(form.duration_days), image_url: form.image_url, is_active: form.is_active,
+      duration_days: parseInt(form.duration_days), image_url: finalImageUrl, is_active: form.is_active,
     };
     if (editId) {
       await supabase.from('products').update(payload).eq('id', editId);
@@ -130,16 +138,34 @@ export default function AdminTabs({
     setProducts((prev) => prev.map((pr) => pr.id === id ? { ...pr, is_active: !active } : pr));
   }
 
-  async function uploadProductImage(file: File) {
+  function handleFileSelect(file: File) {
+    setPendingFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (result) setForm((f) => ({ ...f, image_url: result }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function uploadPendingFile(): Promise<string | null> {
+    if (!pendingFile) return null;
     setUploadingImage(true);
-    const ext = file.name.split('.').pop();
-    const filename = `product-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from('product-images').upload(filename, file, { upsert: true });
-    if (!error) {
-      const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(filename);
-      setForm((f) => ({ ...f, image_url: publicUrl }));
+    try {
+      const ext = (pendingFile.name.split('.').pop() ?? 'jpg').toLowerCase();
+      const filename = `product-${Date.now()}.${ext}`;
+      const { data, error } = await supabase.storage
+        .from('product-images')
+        .upload(filename, pendingFile, { contentType: pendingFile.type, upsert: true });
+      if (error) { alert('Fotograf yuklenemedi: ' + error.message); return null; }
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(data.path);
+      return urlData.publicUrl;
+    } catch (e) {
+      alert('Beklenmeyen hata: ' + String(e));
+      return null;
+    } finally {
+      setUploadingImage(false);
     }
-    setUploadingImage(false);
   }
 
   async function deleteProduct(id: string) {
@@ -317,7 +343,7 @@ export default function AdminTabs({
                   placeholder="https://... veya bilgisayardan yukle"
                   className="flex-1 bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/50" />
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadProductImage(f); }} />
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
                 <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}
                   className="flex items-center gap-2 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-200 text-sm rounded-lg transition-all shrink-0">
                   {uploadingImage ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}
