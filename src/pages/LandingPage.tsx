@@ -221,18 +221,18 @@ export default function LandingPage({ onNavigate }: Props) {
           <div className="text-center max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-3 sm:px-4 py-1.5 mb-5 sm:mb-6">
               <ShoppingBag size={13} className="text-amber-400 shrink-0" />
-              <span className="text-amber-400 text-xs sm:text-sm font-medium">Buy Products with USDT TRC20, Earn Profit</span>
+              <span className="text-amber-400 text-xs sm:text-sm font-medium">Buy Products, Earn Profit</span>
             </div>
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-5 sm:mb-6">
               Buy Products,{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-600">
-                Automatic
+                Earn Profit
               </span>{' '}
-              Income<br className="hidden sm:block" />
-              {' '}on Autopilot
+              <br className="hidden sm:block" />
+              Automatically
             </h1>
             <p className="text-base sm:text-lg text-gray-400 mb-7 sm:mb-8 leading-relaxed px-2 sm:px-0">
-              Invest in our dropshipping products with USDT TRC20 and have the profit from product sales automatically credited to your account.
+              Purchase products and have the profit from sales automatically credited to your account.
               No inventory hassle, no shipping hassle — just earn.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 sm:px-0">
@@ -451,9 +451,9 @@ export default function LandingPage({ onNavigate }: Props) {
               <div className="space-y-4">
                 <div className="text-sm text-gray-500 font-medium uppercase tracking-wider mb-2">Sample Earnings Calculator</div>
                 {[
-                  { invest: 100, rate: 8.5, label: 'Small Budget' },
-                  { invest: 500, rate: 18.5, label: 'Mid Budget' },
-                  { invest: 2000, rate: 28.0, label: 'Large Budget' },
+                  { invest: 100, rate: 8.5, label: '' },
+                  { invest: 500, rate: 18.5, label: '' },
+                  { invest: 2000, rate: 28.0, label: '' },
                 ].map((ex) => {
                   const profit = (ex.invest * ex.rate) / 100;
                   const barWidth = Math.round((ex.rate / 35) * 100);
@@ -461,8 +461,7 @@ export default function LandingPage({ onNavigate }: Props) {
                     <div key={ex.label} className="bg-gray-800/60 border border-gray-700/60 rounded-xl p-4">
                       <div className="flex justify-between items-center mb-2">
                         <div>
-                          <span className="text-white font-semibold text-sm">{ex.label}</span>
-                          <span className="text-gray-500 text-xs ml-2">${ex.invest} invested</span>
+                          <span className="text-gray-500 text-xs">${ex.invest} invested</span>
                         </div>
                         <div className="text-right">
                           <span className="text-emerald-400 font-bold text-sm">+${profit.toFixed(0)} profit</span>
