@@ -96,8 +96,17 @@ export default function ProductsPage({ onNavigate }: Props) {
       return;
     }
 
-    const newBalance = profile.balance - product.price;
-    await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
+    const { error: balError } = await supabase
+      .from('profiles')
+      .update({ balance: profile.balance - product.price })
+      .eq('id', user.id);
+
+    if (balError) {
+      setFeedback({ id: product.id, ok: false, msg: 'Investment recorded but balance update failed. Please refresh.' });
+      setBuying(null);
+      setTimeout(() => setFeedback(null), 4000);
+      return;
+    }
 
     await supabase.from('transactions').insert({
       user_id: user.id,
@@ -107,14 +116,18 @@ export default function ProductsPage({ onNavigate }: Props) {
       description: `${product.name} investment`,
     });
 
-    // Refresh investments list
+    // Refresh investments list then profile — order matters to avoid stale balance flash
     const { data: invData } = await supabase
       .from('investments')
       .select('*, products(*)')
       .eq('user_id', user.id)
       .eq('status', 'active')
       .order('created_at', { ascending: false });
-    if (invData) setActiveInvestments(invData as ActiveInvestmentWithProduct[]);
+    if (invData) {
+      setActiveInvestments(
+        (invData as ActiveInvestmentWithProduct[]).filter((inv) => inv.products != null)
+      );
+    }
 
     await refreshProfile();
     setBuying(null);
@@ -145,7 +158,11 @@ export default function ProductsPage({ onNavigate }: Props) {
       .eq('user_id', user.id)
       .eq('status', 'active')
       .order('created_at', { ascending: false });
-    if (invData) setActiveInvestments(invData as ActiveInvestmentWithProduct[]);
+    if (invData) {
+      setActiveInvestments(
+        (invData as ActiveInvestmentWithProduct[]).filter((inv) => inv.products != null)
+      );
+    }
     await refreshProfile();
 
     setRemoving(false);

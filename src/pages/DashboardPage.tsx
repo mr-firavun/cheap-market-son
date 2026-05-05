@@ -222,10 +222,15 @@ export default function DashboardPage({ onNavigate }: Props) {
     const now = new Date();
     const completed = investments.filter((inv) => inv.status === 'active' && new Date(inv.end_date) <= now);
 
+    // Fetch fresh balance before mutating to avoid stale reads in loop
+    const { data: freshProfileData } = await supabase.from('profiles').select('balance').eq('id', user.id).maybeSingle();
+    let runningBalance: number = (freshProfileData as { balance: number } | null)?.balance ?? profile.balance;
+
     for (const inv of completed) {
       const totalReturn = inv.amount + inv.profit_amount;
+      runningBalance += totalReturn;
       await supabase.from('investments').update({ status: 'completed' }).eq('id', inv.id);
-      await supabase.from('profiles').update({ balance: profile.balance + totalReturn }).eq('id', user.id);
+      await supabase.from('profiles').update({ balance: runningBalance }).eq('id', user.id);
       await supabase.from('transactions').insert({ user_id: user.id, type: 'profit', amount: inv.profit_amount, status: 'completed', description: 'Investment profit', reference_id: inv.id });
       if (profile.referred_by) {
         const referralBonus = inv.profit_amount * 0.1;
