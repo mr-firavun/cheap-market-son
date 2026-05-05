@@ -42,7 +42,7 @@ type InvestmentWithUser = Investment & {
 };
 
 const EMPTY_PRODUCT = {
-  name: '', description: '', price: '', profit_rate: '', duration_days: '', image_url: '', is_active: true,
+  name: '', description: '', price: '', profit_rate: '', duration_days: '', daily_profit: '', image_url: '', is_active: true,
 };
 
 const TX_TYPE_TR: Record<string, string> = {
@@ -118,10 +118,12 @@ export default function AdminTabs({
       else if (finalImageUrl.startsWith('data:')) finalImageUrl = '';
       setPendingFile(null);
     }
+    const dailyProfitVal = form.daily_profit.trim() !== '' ? parseFloat(form.daily_profit) : null;
     const payload = {
       name: form.name, description: form.description,
       price: parseFloat(form.price), profit_rate: parseFloat(form.profit_rate),
       duration_days: parseInt(form.duration_days), image_url: finalImageUrl, is_active: form.is_active,
+      daily_profit: dailyProfitVal && !isNaN(dailyProfitVal) ? dailyProfitVal : null,
     };
     if (editId) {
       await supabase.from('products').update(payload).eq('id', editId);
@@ -181,6 +183,7 @@ export default function AdminTabs({
       name: product.name, description: product.description,
       price: product.price.toString(), profit_rate: product.profit_rate.toString(),
       duration_days: product.duration_days.toString(), image_url: product.image_url || '',
+      daily_profit: product.daily_profit != null ? product.daily_profit.toString() : '',
       is_active: product.is_active,
     });
     setShowForm(true);
@@ -331,6 +334,18 @@ export default function AdminTabs({
               <input type="number" value={form.duration_days}
                 onChange={(e) => setForm((f) => ({ ...f, duration_days: e.target.value }))}
                 placeholder="30"
+                className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/50" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <DollarSign size={12} />
+                  Gunluk Ortalama Kar (USDT) <span className="text-gray-600 font-normal">(opsiyonel)</span>
+                </span>
+              </label>
+              <input type="number" value={form.daily_profit}
+                onChange={(e) => setForm((f) => ({ ...f, daily_profit: e.target.value }))}
+                placeholder="3.50"
                 className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/50" />
             </div>
             <div className="sm:col-span-2">

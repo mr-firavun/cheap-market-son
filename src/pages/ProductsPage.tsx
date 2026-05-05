@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   TrendingUp, ShoppingCart, CheckCircle, AlertCircle, Loader,
-  Lock, Star, Zap, Package, ChevronRight, Trash2, X, AlertTriangle, Gift
+  Lock, Star, Zap, Package, ChevronRight, Trash2, X, AlertTriangle, Gift, BarChart2
 } from 'lucide-react';
 import { supabase, Product, Investment } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -392,10 +392,21 @@ export default function ProductsPage({ onNavigate }: Props) {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-xs text-gray-600 bg-gray-800/40 rounded-lg px-3 py-2 mb-4">
+                        <div className="flex items-center justify-between text-xs text-gray-600 bg-gray-800/40 rounded-lg px-3 py-2 mb-2">
                           <span>Total Return</span>
                           <span className="text-emerald-400 font-semibold">${totalReturn.toFixed(2)}</span>
                         </div>
+
+                        {product.daily_profit != null && (
+                          <div className="flex items-center justify-between text-xs bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
+                            <span className="flex items-center gap-1.5 text-amber-400/80">
+                              <BarChart2 size={11} />
+                              Daily Avg. Profit
+                            </span>
+                            <span className="text-amber-400 font-bold">${Number(product.daily_profit).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {product.daily_profit == null && <div className="mb-4" />}
 
                         {fb && (
                           <div className={`flex items-center gap-2 text-xs px-3 py-2.5 rounded-lg mb-3 ${

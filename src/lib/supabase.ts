@@ -34,6 +34,7 @@ export type Product = {
   price: number;
   profit_rate: number;
   duration_days: number;
+  daily_profit: number | null;
   is_active: boolean;
   image_url: string;
   min_amount: number;
