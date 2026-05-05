@@ -2,11 +2,14 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, Profile } from '../lib/supabase';
 
+const REFERRAL_BONUS_DAYS = 45;
+
 type AuthContextType = {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  hasReferralBonus: boolean;
   signUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -20,6 +23,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const hasReferralBonus = Boolean(
+    profile?.referral_bonus_expires_at &&
+    new Date(profile.referral_bonus_expires_at) > new Date()
+  );
 
   async function fetchProfile(userId: string) {
     const { data, error } = await supabase
@@ -68,17 +76,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (referralCode) {
         const { data: refProfile } = await supabase
           .from('profiles')
-          .select('id')
+          .select('id, referral_bonus_expires_at')
           .eq('referral_code', referralCode)
           .maybeSingle();
-        if (refProfile) referredById = refProfile.id;
+        if (refProfile) {
+          referredById = (refProfile as { id: string }).id;
+
+          // Grant or extend referral bonus to the referrer
+          const bonusExpiry = new Date();
+          bonusExpiry.setDate(bonusExpiry.getDate() + REFERRAL_BONUS_DAYS);
+          await supabase
+            .from('profiles')
+            .update({ referral_bonus_expires_at: bonusExpiry.toISOString() })
+            .eq('id', referredById);
+        }
       }
+
+      // Grant referral bonus to the new user (referee) if they used a referral code
+      const bonusExpiry = new Date();
+      bonusExpiry.setDate(bonusExpiry.getDate() + REFERRAL_BONUS_DAYS);
 
       await supabase.from('profiles').upsert({
         id: data.user.id,
         email,
         full_name: fullName,
         referred_by: referredById,
+        referral_bonus_expires_at: referredById ? bonusExpiry.toISOString() : null,
       });
     }
 
@@ -95,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, hasReferralBonus, signUp, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

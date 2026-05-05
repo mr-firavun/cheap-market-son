@@ -22,6 +22,7 @@ export type Profile = {
   wallet_address: string;
   phone_number: string;
   phone_verified: boolean;
+  referral_bonus_expires_at: string | null;
   created_at: string;
   updated_at: string;
 };

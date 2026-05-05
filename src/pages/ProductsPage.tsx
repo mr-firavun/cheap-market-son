@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   TrendingUp, ShoppingCart, CheckCircle, AlertCircle, Loader,
-  Lock, Star, Zap, Package, ChevronRight, Trash2, X, AlertTriangle
+  Lock, Star, Zap, Package, ChevronRight, Trash2, X, AlertTriangle, Gift
 } from 'lucide-react';
 import { supabase, Product, Investment } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -30,7 +30,7 @@ function tierLabel(rate: number) {
 type ActiveInvestmentWithProduct = Investment & { products: Product };
 
 export default function ProductsPage({ onNavigate }: Props) {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, hasReferralBonus } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [activeInvestments, setActiveInvestments] = useState<ActiveInvestmentWithProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,13 +77,14 @@ export default function ProductsPage({ onNavigate }: Props) {
 
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + product.duration_days);
-    const profitAmount = (product.price * product.profit_rate) / 100;
+    const effectiveRate = hasReferralBonus ? product.profit_rate + 10 : product.profit_rate;
+    const profitAmount = (product.price * effectiveRate) / 100;
 
     const { error: invError } = await supabase.from('investments').insert({
       user_id: user.id,
       product_id: product.id,
       amount: product.price,
-      profit_rate: product.profit_rate,
+      profit_rate: effectiveRate,
       profit_amount: profitAmount,
       end_date: endDate.toISOString(),
       status: 'active',
@@ -185,9 +186,20 @@ export default function ProductsPage({ onNavigate }: Props) {
           </p>
 
           {user && profile ? (
-            <div className="inline-flex items-center gap-3 mt-5 bg-gray-900 border border-gray-800 rounded-xl px-5 py-2.5 text-sm">
-              <span className="text-gray-500">Available Balance:</span>
-              <span className="text-emerald-400 font-bold text-base">${profile.balance.toFixed(2)} USDT</span>
+            <div className="flex flex-col items-center gap-2 mt-5">
+              <div className="inline-flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-2.5 text-sm">
+                <span className="text-gray-500">Available Balance:</span>
+                <span className="text-emerald-400 font-bold text-base">${profile.balance.toFixed(2)} USDT</span>
+              </div>
+              {hasReferralBonus && profile.referral_bonus_expires_at && (
+                <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-2 text-sm text-emerald-400">
+                  <Gift size={14} />
+                  <span className="font-semibold">Referral Bonus Active</span>
+                  <span className="text-emerald-500/70 text-xs">
+                    — +10% on all products · expires {new Date(profile.referral_bonus_expires_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="inline-flex items-center gap-2 mt-5 bg-amber-500/5 border border-amber-500/20 rounded-xl px-5 py-2.5 text-sm text-amber-400/80">
@@ -302,9 +314,10 @@ export default function ProductsPage({ onNavigate }: Props) {
                   const locked = user ? !canAfford : false;
                   const isBuying = buying === product.id;
                   const fb = feedback?.id === product.id ? feedback : null;
-                  const badge = tierLabel(product.profit_rate);
+                  const effectiveRate = hasReferralBonus ? product.profit_rate + 10 : product.profit_rate;
+                  const badge = tierLabel(effectiveRate);
                   const img = product.image_url || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
-                  const totalReturn = product.price + (product.price * product.profit_rate) / 100;
+                  const totalReturn = product.price + (product.price * effectiveRate) / 100;
 
                   return (
                     <div
@@ -324,7 +337,13 @@ export default function ProductsPage({ onNavigate }: Props) {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent" />
 
-                        {badge && !locked && (
+                        {hasReferralBonus && !locked && (
+                          <div className="absolute top-3 left-3 flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-gray-950">
+                            <Star size={10} fill="currentColor" />
+                            +10% Bonus
+                          </div>
+                        )}
+                        {!hasReferralBonus && badge && !locked && (
                           <div className={`absolute top-3 left-3 flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${badge.color}`}>
                             <Star size={10} fill="currentColor" />
                             {badge.label}
@@ -354,13 +373,20 @@ export default function ProductsPage({ onNavigate }: Props) {
                         )}
 
                         <div className="grid grid-cols-2 gap-2 mb-4">
-                          <div className="bg-gray-800/60 rounded-xl p-2.5 text-center">
-                            <div className="text-emerald-400 font-bold text-sm">{product.profit_rate}%</div>
+                          <div className={`rounded-xl p-2.5 text-center ${hasReferralBonus ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-gray-800/60'}`}>
+                            {hasReferralBonus ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <span className="text-gray-500 line-through text-xs">{product.profit_rate}%</span>
+                                <span className="text-emerald-400 font-bold text-sm">{effectiveRate}%</span>
+                              </div>
+                            ) : (
+                              <div className="text-emerald-400 font-bold text-sm">{effectiveRate}%</div>
+                            )}
                             <div className="text-gray-600 text-xs mt-0.5">Profit</div>
                           </div>
                           <div className="bg-gray-800/60 rounded-xl p-2.5 text-center">
                             <div className="text-amber-400 font-bold text-sm">
-                              ${((product.price * product.profit_rate) / 100).toFixed(0)}
+                              ${((product.price * effectiveRate) / 100).toFixed(0)}
                             </div>
                             <div className="text-gray-600 text-xs mt-0.5">Earnings</div>
                           </div>
