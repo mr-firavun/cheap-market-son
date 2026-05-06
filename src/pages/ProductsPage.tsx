@@ -398,12 +398,12 @@ export default function ProductsPage({ onNavigate }: Props) {
                         </div>
 
                         {product.daily_profit != null && (
-                          <div className="flex items-center justify-between text-xs bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
-                            <span className="flex items-center gap-1.5 text-amber-400/80">
+                          <div className="flex items-center justify-between text-xs bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
+                            <span className="flex items-center gap-1.5 text-amber-300">
                               <BarChart2 size={11} />
-                              Daily Avg. Profit
+                              Gunluk Ortalama Kar
                             </span>
-                            <span className="text-amber-400 font-bold">${Number(product.daily_profit).toFixed(2)}</span>
+                            <span className="text-amber-400 font-bold">+${Number(product.daily_profit).toFixed(2)}</span>
                           </div>
                         )}
                         {product.daily_profit == null && <div className="mb-4" />}

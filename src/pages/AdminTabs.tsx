@@ -409,7 +409,7 @@ export default function AdminTabs({
             )}
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm">{p.name}</div>
-              <div className="text-xs text-gray-500 mt-0.5">${p.price} USDT &bull; %{p.profit_rate} kar &bull; {p.duration_days} gun</div>
+              <div className="text-xs text-gray-500 mt-0.5">${p.price} USDT &bull; %{p.profit_rate} kar &bull; {p.duration_days} gun{p.daily_profit != null ? ` • $${Number(p.daily_profit).toFixed(2)}/gun` : ''}</div>
               {p.description && <div className="text-xs text-gray-600 mt-0.5 truncate">{p.description}</div>}
             </div>
             <div className="flex items-center gap-2 shrink-0">
