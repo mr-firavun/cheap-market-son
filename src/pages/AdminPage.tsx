@@ -92,15 +92,28 @@ export default function AdminPage({ onNavigate }: Props) {
   }
 
   async function approveWithdrawal(tx: Transaction) {
-    await supabase.from('transactions').update({ status: 'completed' }).eq('id', tx.id);
-    await reloadWithdrawals();
+    try {
+      const { error } = await supabase.from('transactions').update({ status: 'completed' }).eq('id', tx.id);
+      if (error) throw error;
+      await reloadWithdrawals();
+    } catch (err) {
+      alert('Onaylama hatasi: ' + (err as Error).message);
+    }
   }
 
   async function rejectWithdrawal(tx: Transaction) {
-    const { data: usr } = await supabase.from('profiles').select('balance').eq('id', tx.user_id).maybeSingle();
-    if (usr) await supabase.from('profiles').update({ balance: (usr as { balance: number }).balance + Number(tx.amount) }).eq('id', tx.user_id);
-    await supabase.from('transactions').update({ status: 'rejected' }).eq('id', tx.id);
-    await reloadWithdrawals();
+    try {
+      const { data: usr } = await supabase.from('profiles').select('balance').eq('id', tx.user_id).maybeSingle();
+      if (usr) {
+        const { error } = await supabase.from('profiles').update({ balance: (usr as { balance: number }).balance + Number(tx.amount) }).eq('id', tx.user_id);
+        if (error) throw error;
+      }
+      const { error: txErr } = await supabase.from('transactions').update({ status: 'rejected' }).eq('id', tx.id);
+      if (txErr) throw txErr;
+      await reloadWithdrawals();
+    } catch (err) {
+      alert('Red hatasi: ' + (err as Error).message);
+    }
   }
 
   if (profile === null) {

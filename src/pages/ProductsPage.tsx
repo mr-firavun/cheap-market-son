@@ -139,35 +139,40 @@ export default function ProductsPage({ onNavigate }: Props) {
   async function handleEarlyWithdraw() {
     if (!user || !profile || !removeConfirm) return;
     setRemoving(true);
+    try {
+      const penalty = removeConfirm.amount * 0.2;
+      const refund = removeConfirm.amount - penalty;
 
-    const penalty = removeConfirm.amount * 0.2;
-    const refund = removeConfirm.amount - penalty;
+      const { error: invErr } = await supabase.from('investments').update({ status: 'cancelled' }).eq('id', removeConfirm.id);
+      if (invErr) throw invErr;
+      const { error: balErr } = await supabase.from('profiles').update({ balance: profile.balance + refund }).eq('id', user.id);
+      if (balErr) throw balErr;
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        type: 'withdrawal',
+        amount: refund,
+        status: 'completed',
+        description: `Early removal — 20% penalty applied (${removeConfirm.products?.name ?? 'product'})`,
+      });
 
-    await supabase.from('investments').update({ status: 'cancelled' }).eq('id', removeConfirm.id);
-    await supabase.from('profiles').update({ balance: profile.balance + refund }).eq('id', user.id);
-    await supabase.from('transactions').insert({
-      user_id: user.id,
-      type: 'withdrawal',
-      amount: refund,
-      status: 'completed',
-      description: `Early removal — 20% penalty applied (${removeConfirm.products?.name ?? 'product'})`,
-    });
-
-    const { data: invData } = await supabase
-      .from('investments')
-      .select('*, products(*)')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false });
-    if (invData) {
-      setActiveInvestments(
-        (invData as ActiveInvestmentWithProduct[]).filter((inv) => inv.products != null)
-      );
+      const { data: invData } = await supabase
+        .from('investments')
+        .select('*, products(*)')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      if (invData) {
+        setActiveInvestments(
+          (invData as ActiveInvestmentWithProduct[]).filter((inv) => inv.products != null)
+        );
+      }
+      await refreshProfile();
+      setRemoveConfirm(null);
+    } catch {
+      // keep modal open so user can retry
+    } finally {
+      setRemoving(false);
     }
-    await refreshProfile();
-
-    setRemoving(false);
-    setRemoveConfirm(null);
   }
 
   return (

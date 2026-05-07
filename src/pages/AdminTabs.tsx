@@ -111,33 +111,38 @@ export default function AdminTabs({
   async function saveProduct() {
     if (!form.name || !form.price || !form.profit_rate || !form.duration_days) return;
     setSaving(true);
-    let finalImageUrl = form.image_url;
-    if (pendingFile) {
-      const uploaded = await uploadPendingFile();
-      if (uploaded) finalImageUrl = uploaded;
-      else if (finalImageUrl.startsWith('data:')) finalImageUrl = '';
-      setPendingFile(null);
+    try {
+      let finalImageUrl = form.image_url;
+      if (pendingFile) {
+        const uploaded = await uploadPendingFile();
+        if (uploaded) finalImageUrl = uploaded;
+        else if (finalImageUrl.startsWith('data:')) finalImageUrl = '';
+        setPendingFile(null);
+      }
+      const dailyProfitVal = form.daily_profit.trim() !== '' ? parseFloat(form.daily_profit) : null;
+      const payload = {
+        name: form.name, description: form.description,
+        price: parseFloat(form.price), profit_rate: parseFloat(form.profit_rate),
+        duration_days: parseInt(form.duration_days), image_url: finalImageUrl, is_active: form.is_active,
+        daily_profit: dailyProfitVal && !isNaN(dailyProfitVal) ? dailyProfitVal : null,
+      };
+      const { error } = editId
+        ? await supabase.from('products').update(payload).eq('id', editId)
+        : await supabase.from('products').insert(payload);
+      if (error) throw error;
+      const { data } = await supabase.from('products').select('*').order('price');
+      if (data) setProducts(data as Product[]);
+      setShowForm(false); setEditId(null); setForm(EMPTY_PRODUCT);
+    } catch (err) {
+      alert('Kayit hatasi: ' + (err as Error).message);
+    } finally {
+      setSaving(false);
     }
-    const dailyProfitVal = form.daily_profit.trim() !== '' ? parseFloat(form.daily_profit) : null;
-    const payload = {
-      name: form.name, description: form.description,
-      price: parseFloat(form.price), profit_rate: parseFloat(form.profit_rate),
-      duration_days: parseInt(form.duration_days), image_url: finalImageUrl, is_active: form.is_active,
-      daily_profit: dailyProfitVal && !isNaN(dailyProfitVal) ? dailyProfitVal : null,
-    };
-    if (editId) {
-      await supabase.from('products').update(payload).eq('id', editId);
-    } else {
-      await supabase.from('products').insert(payload);
-    }
-    const { data } = await supabase.from('products').select('*').order('price');
-    if (data) setProducts(data as Product[]);
-    setShowForm(false); setEditId(null); setForm(EMPTY_PRODUCT); setSaving(false);
   }
 
   async function toggleProduct(id: string, active: boolean) {
-    await supabase.from('products').update({ is_active: !active }).eq('id', id);
-    setProducts((prev) => prev.map((pr) => pr.id === id ? { ...pr, is_active: !active } : pr));
+    const { error } = await supabase.from('products').update({ is_active: !active }).eq('id', id);
+    if (!error) setProducts((prev) => prev.map((pr) => pr.id === id ? { ...pr, is_active: !active } : pr));
   }
 
   function handleFileSelect(file: File) {
@@ -172,9 +177,15 @@ export default function AdminTabs({
 
   async function deleteProduct(id: string) {
     setDeletingProduct(id);
-    await supabase.from('products').delete().eq('id', id);
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    setDeletingProduct(null);
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) throw error;
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      alert('Silme hatasi: ' + (err as Error).message);
+    } finally {
+      setDeletingProduct(null);
+    }
   }
 
   function startEdit(product: Product) {
@@ -192,36 +203,49 @@ export default function AdminTabs({
   async function saveBalance() {
     if (!editBalance) return;
     setSavingBalance(true);
-    const val = parseFloat(editBalance.value);
-    if (!isNaN(val)) {
-      await supabase.from('profiles').update({ balance: val }).eq('id', editBalance.userId);
-      setUsers((u) => u.map((usr) => usr.id === editBalance!.userId ? { ...usr, balance: val } : usr));
-      await supabase.from('transactions').insert({
-        user_id: editBalance.userId, type: 'deposit', amount: val,
-        status: 'completed', description: 'Admin bakiye guncellemesi',
-      });
+    try {
+      const val = parseFloat(editBalance.value);
+      if (!isNaN(val)) {
+        const { error } = await supabase.from('profiles').update({ balance: val }).eq('id', editBalance.userId);
+        if (error) throw error;
+        setUsers((u) => u.map((usr) => usr.id === editBalance!.userId ? { ...usr, balance: val } : usr));
+        await supabase.from('transactions').insert({
+          user_id: editBalance.userId, type: 'deposit', amount: val,
+          status: 'completed', description: 'Admin bakiye guncellemesi',
+        });
+      }
+      setEditBalance(null);
+    } catch (err) {
+      alert('Bakiye guncelleme hatasi: ' + (err as Error).message);
+    } finally {
+      setSavingBalance(false);
     }
-    setEditBalance(null); setSavingBalance(false);
   }
 
   async function saveUser() {
     if (!editUser) return;
     setSavingUser(true);
-    await supabase.from('profiles').update({
-      full_name: editUser.full_name,
-      phone_number: editUser.phone_number,
-      wallet_address: editUser.wallet_address,
-      is_admin: editUser.is_admin,
-    }).eq('id', editUser.userId);
-    setUsers((prev) => prev.map((u) => u.id === editUser.userId ? {
-      ...u,
-      full_name: editUser.full_name,
-      phone_number: editUser.phone_number,
-      wallet_address: editUser.wallet_address,
-      is_admin: editUser.is_admin,
-    } : u));
-    setSavingUser(false);
-    setEditUser(null);
+    try {
+      const { error } = await supabase.from('profiles').update({
+        full_name: editUser.full_name,
+        phone_number: editUser.phone_number,
+        wallet_address: editUser.wallet_address,
+        is_admin: editUser.is_admin,
+      }).eq('id', editUser.userId);
+      if (error) throw error;
+      setUsers((prev) => prev.map((u) => u.id === editUser.userId ? {
+        ...u,
+        full_name: editUser.full_name,
+        phone_number: editUser.phone_number,
+        wallet_address: editUser.wallet_address,
+        is_admin: editUser.is_admin,
+      } : u));
+      setEditUser(null);
+    } catch (err) {
+      alert('Kullanici guncelleme hatasi: ' + (err as Error).message);
+    } finally {
+      setSavingUser(false);
+    }
   }
 
   function startEditUser(u: UserWithStats) {
@@ -255,23 +279,37 @@ export default function AdminTabs({
   async function sendReply(userId: string) {
     if (!replyText.trim()) return;
     setSendingReply(true);
-    await supabase.from('support_messages').insert({
-      user_id: userId, sender: 'support', message: replyText.trim(), is_read: true,
-    });
-    await supabase.from('support_messages').update({ is_read: true }).eq('user_id', userId).eq('sender', 'user');
-    const { data } = await supabase.from('support_messages').select('*').order('created_at', { ascending: true });
-    if (data) setSupportMessages(data as SupportMessage[]);
-    setReplyText(''); setSendingReply(false);
+    try {
+      const { error } = await supabase.from('support_messages').insert({
+        user_id: userId, sender: 'support', message: replyText.trim(), is_read: true,
+      });
+      if (error) throw error;
+      await supabase.from('support_messages').update({ is_read: true }).eq('user_id', userId).eq('sender', 'user');
+      const { data } = await supabase.from('support_messages').select('*').order('created_at', { ascending: true });
+      if (data) setSupportMessages(data as SupportMessage[]);
+      setReplyText('');
+    } catch (err) {
+      alert('Mesaj gonderme hatasi: ' + (err as Error).message);
+    } finally {
+      setSendingReply(false);
+    }
   }
 
   async function saveSettings() {
     setSavingSettings(true);
-    await Promise.all(
-      Object.entries(settingsForm).map(([key, value]) =>
-        supabase.from('platform_settings').upsert({ key, value, updated_at: new Date().toISOString() })
-      )
-    );
-    setSavingSettings(false);
+    try {
+      const results = await Promise.all(
+        Object.entries(settingsForm).map(([key, value]) =>
+          supabase.from('platform_settings').upsert({ key, value, updated_at: new Date().toISOString() })
+        )
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    } catch (err) {
+      alert('Ayarlar kaydedilemedi: ' + (err as Error).message);
+    } finally {
+      setSavingSettings(false);
+    }
   }
 
   const activeThread = openThread ? threads.find((t) => t.user_id === openThread) : null;
@@ -733,11 +771,11 @@ export default function AdminTabs({
             </div>
           )}
           <div className="flex gap-3">
-            <button onClick={() => { setProcessingWithdrawal(tx.id); approveWithdrawal(tx).then(() => setProcessingWithdrawal(null)); }} disabled={processingWithdrawal === tx.id}
+            <button onClick={() => { setProcessingWithdrawal(tx.id); approveWithdrawal(tx).finally(() => setProcessingWithdrawal(null)); }} disabled={processingWithdrawal === tx.id}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-sm font-semibold transition-all disabled:opacity-50">
               {processingWithdrawal === tx.id ? <Loader size={14} className="animate-spin" /> : <Check size={14} />} Onayla
             </button>
-            <button onClick={() => { setProcessingWithdrawal(tx.id); rejectWithdrawal(tx).then(() => setProcessingWithdrawal(null)); }} disabled={processingWithdrawal === tx.id}
+            <button onClick={() => { setProcessingWithdrawal(tx.id); rejectWithdrawal(tx).finally(() => setProcessingWithdrawal(null)); }} disabled={processingWithdrawal === tx.id}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-xl text-sm font-semibold transition-all disabled:opacity-50">
               {processingWithdrawal === tx.id ? <Loader size={14} className="animate-spin" /> : <X size={14} />} Reddet
             </button>

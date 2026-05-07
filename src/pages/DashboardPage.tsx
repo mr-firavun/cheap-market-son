@@ -246,37 +246,20 @@ export default function DashboardPage({ onNavigate }: Props) {
   async function processCompletedInvestments() {
     if (!user || !profile || processing) return;
     setProcessing(true);
-    const now = new Date();
-    const completed = investments.filter((inv) => inv.status === 'active' && new Date(inv.end_date) <= now);
-
-    // Fetch fresh balance before mutating to avoid stale reads in loop
-    const { data: freshProfileData } = await supabase.from('profiles').select('balance').eq('id', user.id).maybeSingle();
-    let runningBalance: number = (freshProfileData as { balance: number } | null)?.balance ?? profile.balance;
-
-    for (const inv of completed) {
-      const totalReturn = inv.amount + inv.profit_amount;
-      runningBalance += totalReturn;
-      await supabase.from('investments').update({ status: 'completed' }).eq('id', inv.id);
-      await supabase.from('profiles').update({ balance: runningBalance }).eq('id', user.id);
-      await supabase.from('transactions').insert({ user_id: user.id, type: 'profit', amount: inv.profit_amount, status: 'completed', description: 'Investment profit', reference_id: inv.id });
-      if (profile.referred_by) {
-        const referralBonus = inv.profit_amount * 0.1;
-        const { data: refProfile } = await supabase.from('profiles').select('balance').eq('id', profile.referred_by).maybeSingle();
-        if (refProfile) {
-          await supabase.from('profiles').update({ balance: (refProfile as { balance: number }).balance + referralBonus }).eq('id', profile.referred_by);
-          await supabase.from('transactions').insert({ user_id: profile.referred_by, type: 'referral_bonus', amount: referralBonus, status: 'completed', description: 'Referral commission' });
-        }
-      }
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      await fetch(`${supabaseUrl}/functions/v1/process-completed-investments`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
+      });
+      await loadDashboardData();
+      await refreshProfile();
+    } catch {
+      // silently ignore — data will be consistent on next load
+    } finally {
+      setProcessing(false);
     }
-
-    await refreshProfile();
-    const [invRes, txRes] = await Promise.all([
-      supabase.from('investments').select('*, products(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(60),
-    ]);
-    if (invRes.data) setInvestments(invRes.data as Investment[]);
-    if (txRes.data) setTransactions(txRes.data as Transaction[]);
-    setProcessing(false);
   }
 
   function copyAddr() { navigator.clipboard.writeText(depositAddress); setCopied(true); setTimeout(() => setCopied(false), 2000); }
@@ -295,11 +278,17 @@ export default function DashboardPage({ onNavigate }: Props) {
     if (!trimmed) { setWalletError('Address cannot be empty.'); return; }
     if (!isValidTRC20(trimmed)) { setWalletError('Invalid address. A TRC20 address must start with "T" and be 34 characters long.'); return; }
     setSavingWallet(true);
-    await supabase.from('profiles').update({ wallet_address: trimmed }).eq('id', user.id);
-    await refreshProfile();
-    setSavingWallet(false);
-    setWalletSaved(true);
-    setTimeout(() => setWalletSaved(false), 2500);
+    try {
+      const { error } = await supabase.from('profiles').update({ wallet_address: trimmed }).eq('id', user.id);
+      if (error) throw error;
+      await refreshProfile();
+      setWalletSaved(true);
+      setTimeout(() => setWalletSaved(false), 2500);
+    } catch (err) {
+      setWalletError('Kayit hatasi: ' + (err as Error).message);
+    } finally {
+      setSavingWallet(false);
+    }
   }
 
   async function requestWithdrawal() {
@@ -314,15 +303,22 @@ export default function DashboardPage({ onNavigate }: Props) {
     if (amount > profile.balance) { setWithdrawError('Insufficient balance.'); return; }
 
     setWithdrawing(true);
-    await supabase.from('profiles').update({ balance: profile.balance - amount, wallet_address: trimmedAddr }).eq('id', user.id);
-    await supabase.from('transactions').insert({ user_id: user.id, type: 'withdrawal', amount, status: 'pending', description: 'Withdrawal request', withdrawal_address: trimmedAddr });
-    await refreshProfile();
-    const { data: txData } = await supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(60);
-    if (txData) setTransactions(txData as Transaction[]);
-    setWithdrawAmount('');
-    setWithdrawing(false);
-    setWithdrawSuccess(true);
-    setTimeout(() => setWithdrawSuccess(false), 4000);
+    try {
+      const { error: balErr } = await supabase.from('profiles').update({ balance: profile.balance - amount, wallet_address: trimmedAddr }).eq('id', user.id);
+      if (balErr) throw balErr;
+      const { error: txErr } = await supabase.from('transactions').insert({ user_id: user.id, type: 'withdrawal', amount, status: 'pending', description: 'Withdrawal request', withdrawal_address: trimmedAddr });
+      if (txErr) throw txErr;
+      await refreshProfile();
+      const { data: txData } = await supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(60);
+      if (txData) setTransactions(txData as Transaction[]);
+      setWithdrawAmount('');
+      setWithdrawSuccess(true);
+      setTimeout(() => setWithdrawSuccess(false), 4000);
+    } catch (err) {
+      setWithdrawError('Cekim hatasi: ' + (err as Error).message);
+    } finally {
+      setWithdrawing(false);
+    }
   }
 
   // ── Profile save ──────────────────────────────────────────────────────────
@@ -330,11 +326,17 @@ export default function DashboardPage({ onNavigate }: Props) {
     if (!user) return;
     if (!profileName.trim()) return;
     setSavingProfile(true);
-    await supabase.from('profiles').update({ full_name: profileName.trim() }).eq('id', user.id);
-    await refreshProfile();
-    setSavingProfile(false);
-    setProfileSaved(true);
-    setTimeout(() => setProfileSaved(false), 2500);
+    try {
+      const { error } = await supabase.from('profiles').update({ full_name: profileName.trim() }).eq('id', user.id);
+      if (error) throw error;
+      await refreshProfile();
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2500);
+    } catch {
+      // error shown via UI state would be nice but keep simple for now
+    } finally {
+      setSavingProfile(false);
+    }
   }
 
   // ── Password change ───────────────────────────────────────────────────────
@@ -387,11 +389,17 @@ export default function DashboardPage({ onNavigate }: Props) {
     setPhoneError('');
     if (!isValidPhone(phoneInput)) { setPhoneError('Please enter a valid phone number. (e.g. +1 555 123 4567)'); return; }
     setSavingPhone(true);
-    await supabase.from('profiles').update({ phone_number: phoneInput.trim() }).eq('id', user.id);
-    await refreshProfile();
-    setSavingPhone(false);
-    setPhoneSaved(true);
-    setTimeout(() => setPhoneSaved(false), 2500);
+    try {
+      const { error } = await supabase.from('profiles').update({ phone_number: phoneInput.trim() }).eq('id', user.id);
+      if (error) throw error;
+      await refreshProfile();
+      setPhoneSaved(true);
+      setTimeout(() => setPhoneSaved(false), 2500);
+    } catch (err) {
+      setPhoneError('Kayit hatasi: ' + (err as Error).message);
+    } finally {
+      setSavingPhone(false);
+    }
   }
 
   const activeInvestments = investments.filter((i) => i.status === 'active');
