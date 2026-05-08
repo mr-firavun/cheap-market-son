@@ -349,34 +349,32 @@ export default function DashboardPage({ onNavigate }: Props) {
     if (currentPassword === newPassword) { setPasswordError('New password cannot be the same as the current password.'); return; }
 
     setChangingPassword(true);
+    try {
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: profile?.email || '',
+        password: currentPassword,
+      });
+      if (signInErr) {
+        setPasswordError('Current password is incorrect. Please check and try again.');
+        return;
+      }
 
-    // Re-authenticate with current password first
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
-      email: profile?.email || '',
-      password: currentPassword,
-    });
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) {
+        setPasswordError('Password could not be updated. Please try again.');
+        return;
+      }
 
-    if (signInErr) {
+      setPasswordSuccess('Your password has been updated successfully.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPasswordSuccess(''), 4000);
+    } catch (err) {
+      setPasswordError('Beklenmeyen hata: ' + (err as Error).message);
+    } finally {
       setChangingPassword(false);
-      setPasswordError('Current password is incorrect. Please check and try again.');
-      return;
     }
-
-    // Update password
-    const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
-
-    setChangingPassword(false);
-
-    if (updateErr) {
-      setPasswordError('Password could not be updated. Please try again.');
-      return;
-    }
-
-    setPasswordSuccess('Your password has been updated successfully.');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setTimeout(() => setPasswordSuccess(''), 4000);
   }
 
   // ── Phone save ────────────────────────────────────────────────────────────

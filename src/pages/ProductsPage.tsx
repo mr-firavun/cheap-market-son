@@ -75,67 +75,67 @@ export default function ProductsPage({ onNavigate }: Props) {
     setBuying(product.id);
     setFeedback(null);
 
-    const endDate = new Date();
-    endDate.setTime(endDate.getTime() + product.duration_days * 24 * 60 * 60 * 1000);
-    const effectiveRate = hasReferralBonus ? product.profit_rate + 10 : product.profit_rate;
-    const profitAmount = product.daily_profit != null
-      ? Number(product.daily_profit) * product.duration_days
-      : (product.price * effectiveRate) / 100;
+    try {
+      const endDate = new Date();
+      endDate.setTime(endDate.getTime() + product.duration_days * 24 * 60 * 60 * 1000);
+      const effectiveRate = hasReferralBonus ? product.profit_rate + 10 : product.profit_rate;
+      const profitAmount = product.daily_profit != null
+        ? Number(product.daily_profit) * product.duration_days
+        : (product.price * effectiveRate) / 100;
 
-    const { error: invError } = await supabase.from('investments').insert({
-      user_id: user.id,
-      product_id: product.id,
-      amount: product.price,
-      profit_rate: effectiveRate,
-      profit_amount: profitAmount,
-      end_date: endDate.toISOString(),
-      status: 'active',
-    });
+      const { error: invError } = await supabase.from('investments').insert({
+        user_id: user.id,
+        product_id: product.id,
+        amount: product.price,
+        profit_rate: effectiveRate,
+        profit_amount: profitAmount,
+        end_date: endDate.toISOString(),
+        status: 'active',
+      });
 
-    if (invError) {
-      setFeedback({ id: product.id, ok: false, msg: 'Could not create investment. Please try again.' });
-      setBuying(null);
-      setTimeout(() => setFeedback(null), 3500);
-      return;
-    }
+      if (invError) {
+        setFeedback({ id: product.id, ok: false, msg: 'Could not create investment. Please try again.' });
+        return;
+      }
 
-    const { error: balError } = await supabase
-      .from('profiles')
-      .update({ balance: profile.balance - product.price })
-      .eq('id', user.id);
+      const { error: balError } = await supabase
+        .from('profiles')
+        .update({ balance: profile.balance - product.price })
+        .eq('id', user.id);
 
-    if (balError) {
-      setFeedback({ id: product.id, ok: false, msg: 'Investment recorded but balance update failed. Please refresh.' });
-      setBuying(null);
+      if (balError) {
+        setFeedback({ id: product.id, ok: false, msg: 'Investment recorded but balance update failed. Please refresh.' });
+        return;
+      }
+
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        type: 'investment',
+        amount: product.price,
+        status: 'completed',
+        description: `${product.name} yatirimi`,
+      });
+
+      const { data: invData } = await supabase
+        .from('investments')
+        .select('*, products(*)')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      if (invData) {
+        setActiveInvestments(
+          (invData as ActiveInvestmentWithProduct[]).filter((inv) => inv.products != null)
+        );
+      }
+
+      await refreshProfile();
+      setFeedback({ id: product.id, ok: true, msg: 'Yatirim basariyla tamamlandi!' });
       setTimeout(() => setFeedback(null), 4000);
-      return;
+    } catch (err) {
+      setFeedback({ id: product.id, ok: false, msg: 'Beklenmeyen hata: ' + (err as Error).message });
+    } finally {
+      setBuying(null);
     }
-
-    await supabase.from('transactions').insert({
-      user_id: user.id,
-      type: 'investment',
-      amount: product.price,
-      status: 'completed',
-      description: `${product.name} investment`,
-    });
-
-    // Refresh investments list then profile — order matters to avoid stale balance flash
-    const { data: invData } = await supabase
-      .from('investments')
-      .select('*, products(*)')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false });
-    if (invData) {
-      setActiveInvestments(
-        (invData as ActiveInvestmentWithProduct[]).filter((inv) => inv.products != null)
-      );
-    }
-
-    await refreshProfile();
-    setBuying(null);
-    setFeedback({ id: product.id, ok: true, msg: 'Investment completed successfully!' });
-    setTimeout(() => setFeedback(null), 4000);
   }
 
   async function handleEarlyWithdraw() {
