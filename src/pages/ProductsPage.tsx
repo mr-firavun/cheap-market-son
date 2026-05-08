@@ -459,7 +459,7 @@ export default function ProductsPage({ onNavigate }: Props) {
                               ) : (
                                 <>
                                   <ShoppingCart size={15} />
-                                  Buy Now
+                                  Add to Shelf
                                 </>
                               )}
                             </button>
