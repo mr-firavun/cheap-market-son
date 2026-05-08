@@ -74,9 +74,9 @@ function ProfitChart({ transactions }: { transactions: Transaction[] }) {
     if (diffDays > 29) return;
     const idx = 29 - diffDays;
     if (idx < 0 || idx > 29) return;
-    if (['deposit', 'profit', 'referral_bonus'].includes(tx.type)) {
+    if (['profit', 'referral_bonus'].includes(tx.type)) {
       days[idx].net += Number(tx.amount);
-    } else if (['withdrawal', 'investment'].includes(tx.type)) {
+    } else if (tx.type === 'withdrawal') {
       days[idx].net -= Number(tx.amount);
     }
   });

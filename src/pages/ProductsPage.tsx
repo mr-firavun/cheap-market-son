@@ -76,9 +76,11 @@ export default function ProductsPage({ onNavigate }: Props) {
     setFeedback(null);
 
     const endDate = new Date();
-    endDate.setDate(endDate.getDate() + product.duration_days);
+    endDate.setTime(endDate.getTime() + product.duration_days * 24 * 60 * 60 * 1000);
     const effectiveRate = hasReferralBonus ? product.profit_rate + 10 : product.profit_rate;
-    const profitAmount = (product.price * effectiveRate) / 100;
+    const profitAmount = product.daily_profit != null
+      ? Number(product.daily_profit) * product.duration_days
+      : (product.price * effectiveRate) / 100;
 
     const { error: invError } = await supabase.from('investments').insert({
       user_id: user.id,
@@ -322,7 +324,10 @@ export default function ProductsPage({ onNavigate }: Props) {
                   const effectiveRate = hasReferralBonus ? product.profit_rate + 10 : product.profit_rate;
                   const badge = tierLabel(effectiveRate);
                   const img = product.image_url || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
-                  const totalReturn = product.price + (product.price * effectiveRate) / 100;
+                  const profitEarnings = product.daily_profit != null
+                    ? Number(product.daily_profit) * product.duration_days
+                    : (product.price * effectiveRate) / 100;
+                  const totalReturn = product.price + profitEarnings;
 
                   return (
                     <div
@@ -391,7 +396,7 @@ export default function ProductsPage({ onNavigate }: Props) {
                           </div>
                           <div className="bg-gray-800/60 rounded-xl p-2.5 text-center">
                             <div className="text-amber-400 font-bold text-sm">
-                              ${((product.price * effectiveRate) / 100).toFixed(0)}
+                              +${profitEarnings.toFixed(2)}
                             </div>
                             <div className="text-gray-600 text-xs mt-0.5">Earnings</div>
                           </div>
