@@ -573,10 +573,17 @@ export default function DashboardPage({ onNavigate }: Props) {
                   <Users size={16} className="text-sky-400" />
                   <span className="font-semibold text-sm">Referral System</span>
                 </div>
-                <p className="text-xs text-gray-500 mb-3 leading-relaxed">Invite friends and earn <strong className="text-sky-400">10%</strong> commission.</p>
+                <div className="flex items-start gap-2.5 bg-sky-500/10 border border-sky-500/20 rounded-lg p-3 mb-3">
+                  <div className="w-7 h-7 rounded-full bg-sky-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <Users size={13} className="text-sky-400" />
+                  </div>
+                  <p className="text-xs text-sky-300 leading-relaxed">
+                    When someone signs up with your link and makes a <strong className="text-sky-200">$200+ deposit</strong>, you instantly receive <strong className="text-sky-200">$15 USDT</strong> in your balance.
+                  </p>
+                </div>
                 <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                  <div className="text-xs text-gray-400">Your Referral Code:</div>
-                  <div className="text-sm font-mono font-bold text-amber-400 mt-0.5">{profile?.referral_code}</div>
+                  <div className="text-xs text-gray-400 mb-0.5">Your Referral Code:</div>
+                  <div className="text-sm font-mono font-bold text-amber-400">{profile?.referral_code}</div>
                 </div>
                 <button onClick={copyRef}
                   className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${copiedRef ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700'}`}>
