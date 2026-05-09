@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Gift, AlertCircle, KeyRound, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Gift, AlertCircle, KeyRound, ArrowLeft, CheckCircle, MailCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import logoSrc from '../assets/logo.jpeg';
@@ -9,7 +9,7 @@ type Props = {
   initialMode?: 'login' | 'register' | 'forgot' | 'reset';
 };
 
-type Mode = 'login' | 'register' | 'forgot' | 'verify-code' | 'reset-password';
+type Mode = 'login' | 'register' | 'forgot' | 'verify-code' | 'reset-password' | 'email-confirmation';
 
 function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -81,17 +81,24 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
       const { error } = await signIn(form.email, form.password);
       setLoading(false);
       if (error) {
-        setError('Incorrect email or password.');
+        const msg = (error as Error).message?.toLowerCase() ?? '';
+        if (msg.includes('email not confirmed') || msg.includes('email_not_confirmed')) {
+          setError('Please confirm your email address before signing in. Check your inbox for the confirmation link.');
+        } else {
+          setError('Incorrect email or password.');
+        }
       } else {
         onNavigate('dashboard');
       }
     } else {
       if (!form.fullName.trim()) { setError('Full name is required.'); setLoading(false); return; }
       if (form.password.length < 6) { setError('Password must be at least 6 characters.'); setLoading(false); return; }
-      const { error } = await signUp(form.email, form.password, form.fullName, form.referralCode || undefined);
+      const { error, emailConfirmationRequired } = await signUp(form.email, form.password, form.fullName, form.referralCode || undefined);
       setLoading(false);
       if (error) {
         setError('Registration failed. This email may already be in use.');
+      } else if (emailConfirmationRequired) {
+        setMode('email-confirmation');
       } else {
         onNavigate('dashboard');
       }
@@ -329,6 +336,34 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
                 </p>
               )}
             </>
+          )}
+
+          {/* ── EMAIL CONFIRMATION ── */}
+          {mode === 'email-confirmation' && (
+            <div className="text-center py-4">
+              <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-5">
+                <MailCheck size={28} className="text-amber-400" />
+              </div>
+              <h2 className="font-bold text-xl mb-2">Check Your Email</h2>
+              <p className="text-gray-400 text-sm leading-relaxed mb-2">
+                We sent a confirmation link to
+              </p>
+              <p className="text-amber-400 font-semibold text-sm mb-4 break-all">{form.email}</p>
+              <p className="text-gray-500 text-xs leading-relaxed mb-6">
+                Click the link in your email to verify your account. Once verified, you can sign in.
+              </p>
+              <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-4 mb-5 text-left">
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  <span className="text-gray-300 font-medium">Didn't receive it?</span> Check your spam folder. The link expires after 24 hours.
+                </p>
+              </div>
+              <button
+                onClick={() => switchAuthMode('login')}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl transition-all text-sm border border-gray-700"
+              >
+                Back to Sign In
+              </button>
+            </div>
           )}
 
           {/* ── FORGOT PASSWORD ── */}

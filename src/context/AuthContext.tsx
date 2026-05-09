@@ -7,7 +7,7 @@ type AuthContextType = {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<{ error: Error | null; emailConfirmationRequired?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -92,6 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           full_name: fullName,
           referred_by: referredById,
         });
+      }
+
+      // No session means email confirmation is required
+      if (!data.session) {
+        return { error: null, emailConfirmationRequired: true };
       }
 
       return { error: null };
