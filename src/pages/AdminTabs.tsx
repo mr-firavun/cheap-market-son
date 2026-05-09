@@ -45,10 +45,6 @@ const EMPTY_PRODUCT = {
   name: '', description: '', price: '', profit_rate: '', duration_days: '', daily_profit: '', image_url: '', is_active: true,
 };
 
-function pd(val: string): number {
-  return parseFloat(val.replace(',', '.'));
-}
-
 const TX_TYPE_TR: Record<string, string> = {
   deposit: 'Yatirma', withdrawal: 'Cekme', investment: 'Yatirim', profit: 'Kar', referral_bonus: 'Referans',
 };
@@ -114,19 +110,6 @@ export default function AdminTabs({
 
   async function saveProduct() {
     if (!form.name || !form.price || !form.profit_rate || !form.duration_days) return;
-    const priceVal = pd(form.price);
-    const rateVal = pd(form.profit_rate);
-    const daysVal = pd(form.duration_days);
-    if (isNaN(priceVal) || isNaN(rateVal) || isNaN(daysVal) || priceVal <= 0 || daysVal <= 0) {
-      alert('Gecersiz deger. Ondalik icin nokta veya virgul kullanabilirsiniz (ornek: 0.5 veya 0,5).');
-      return;
-    }
-    const dailyRaw = form.daily_profit.trim();
-    const dailyProfitVal = dailyRaw !== '' ? pd(dailyRaw) : null;
-    if (dailyProfitVal !== null && isNaN(dailyProfitVal)) {
-      alert('Gunluk kazanc icin gecerli bir sayi girin.');
-      return;
-    }
     setSaving(true);
     try {
       let finalImageUrl = form.image_url;
@@ -136,22 +119,18 @@ export default function AdminTabs({
         else if (finalImageUrl.startsWith('data:')) finalImageUrl = '';
         setPendingFile(null);
       }
+      const dailyProfitVal = form.daily_profit.trim() !== '' ? parseFloat(form.daily_profit) : null;
       const payload = {
-        name: form.name.trim(),
-        description: form.description.trim(),
-        price: priceVal,
-        profit_rate: rateVal,
-        duration_days: daysVal,
-        image_url: finalImageUrl,
-        is_active: form.is_active,
-        daily_profit: dailyProfitVal,
+        name: form.name, description: form.description,
+        price: parseFloat(form.price), profit_rate: parseFloat(form.profit_rate),
+        duration_days: parseInt(form.duration_days), image_url: finalImageUrl, is_active: form.is_active,
+        daily_profit: dailyProfitVal && !isNaN(dailyProfitVal) ? dailyProfitVal : null,
       };
       const { error } = editId
         ? await supabase.from('products').update(payload).eq('id', editId)
         : await supabase.from('products').insert(payload);
       if (error) throw error;
-      const { data, error: fetchErr } = await supabase.from('products').select('*').order('price');
-      if (fetchErr) throw fetchErr;
+      const { data } = await supabase.from('products').select('*').order('price');
       if (data) setProducts(data as Product[]);
       setShowForm(false); setEditId(null); setForm(EMPTY_PRODUCT);
     } catch (err) {
@@ -225,7 +204,7 @@ export default function AdminTabs({
     if (!editBalance) return;
     setSavingBalance(true);
     try {
-      const val = pd(editBalance.value);
+      const val = parseFloat(editBalance.value);
       if (!isNaN(val)) {
         const { error } = await supabase.from('profiles').update({ balance: val }).eq('id', editBalance.userId);
         if (error) throw error;

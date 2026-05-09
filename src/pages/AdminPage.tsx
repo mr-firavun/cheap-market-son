@@ -72,28 +72,22 @@ export default function AdminPage({ onNavigate }: Props) {
         setUsers((prev) => prev.map((u) => ({ ...u, active_investments: activeCounts[u.id] || 0 })));
       }
       setLoading(false);
-    }).catch(() => {
-      setLoading(false);
     });
   }, [profile]);
 
   async function reloadWithdrawals() {
-    try {
-      const { data: txData } = await supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(200);
-      if (txData) setTransactions(txData as Transaction[]);
-      const { data: uData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-      if (uData) {
-        const txs = txData as Transaction[] || [];
-        const enriched: UserWithStats[] = (uData as Profile[]).map((usr) => {
-          const userTxs = txs.filter((tx) => tx.user_id === usr.id);
-          const total_invested = userTxs.filter((tx) => tx.type === 'investment' && tx.status === 'completed').reduce((s, tx) => s + Number(tx.amount), 0);
-          const total_withdrawn = userTxs.filter((tx) => tx.type === 'withdrawal' && tx.status === 'completed').reduce((s, tx) => s + Number(tx.amount), 0);
-          return { ...usr, total_invested, total_withdrawn, active_investments: 0 };
-        });
-        setUsers(enriched);
-      }
-    } catch {
-      // silently ignore — stale data stays visible
+    const { data } = await supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(200);
+    if (data) setTransactions(data as Transaction[]);
+    const { data: uData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    if (uData) {
+      const txs = (await supabase.from('transactions').select('*').limit(200)).data as Transaction[] || [];
+      const enriched: UserWithStats[] = (uData as Profile[]).map((usr) => {
+        const userTxs = txs.filter((tx) => tx.user_id === usr.id);
+        const total_invested = userTxs.filter((tx) => tx.type === 'investment' && tx.status === 'completed').reduce((s, tx) => s + Number(tx.amount), 0);
+        const total_withdrawn = userTxs.filter((tx) => tx.type === 'withdrawal' && tx.status === 'completed').reduce((s, tx) => s + Number(tx.amount), 0);
+        return { ...usr, total_invested, total_withdrawn, active_investments: 0 };
+      });
+      setUsers(enriched);
     }
   }
 

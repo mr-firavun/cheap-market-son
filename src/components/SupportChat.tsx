@@ -89,11 +89,11 @@ export default function SupportChat() {
     setMessages((p) => [...p, userMsg]);
 
     if (user) {
-      supabase.from('support_messages').insert({ user_id: user.id, sender: 'user', message: msg }).catch(() => {});
+      await supabase.from('support_messages').insert({ user_id: user.id, sender: 'user', message: msg });
     }
 
     setTyping(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       const reply = getAutoReply(msg);
       const botMsg: SupportMessage = {
         id: (Date.now() + 1).toString(),
@@ -107,7 +107,7 @@ export default function SupportChat() {
       setTyping(false);
 
       if (user) {
-        supabase.from('support_messages').insert({ user_id: user.id, sender: 'support', message: reply, is_read: true }).catch(() => {});
+        await supabase.from('support_messages').insert({ user_id: user.id, sender: 'support', message: reply, is_read: true });
       }
     }, 1200);
   }

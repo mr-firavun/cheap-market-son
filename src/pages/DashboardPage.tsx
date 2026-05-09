@@ -74,9 +74,9 @@ function ProfitChart({ transactions }: { transactions: Transaction[] }) {
     if (diffDays > 29) return;
     const idx = 29 - diffDays;
     if (idx < 0 || idx > 29) return;
-    if (['profit', 'referral_bonus'].includes(tx.type)) {
+    if (['deposit', 'profit', 'referral_bonus'].includes(tx.type)) {
       days[idx].net += Number(tx.amount);
-    } else if (tx.type === 'withdrawal') {
+    } else if (['withdrawal', 'investment'].includes(tx.type)) {
       days[idx].net -= Number(tx.amount);
     }
   });
@@ -349,32 +349,34 @@ export default function DashboardPage({ onNavigate }: Props) {
     if (currentPassword === newPassword) { setPasswordError('New password cannot be the same as the current password.'); return; }
 
     setChangingPassword(true);
-    try {
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: profile?.email || '',
-        password: currentPassword,
-      });
-      if (signInErr) {
-        setPasswordError('Current password is incorrect. Please check and try again.');
-        return;
-      }
 
-      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
-      if (updateErr) {
-        setPasswordError('Password could not be updated. Please try again.');
-        return;
-      }
+    // Re-authenticate with current password first
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email: profile?.email || '',
+      password: currentPassword,
+    });
 
-      setPasswordSuccess('Your password has been updated successfully.');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => setPasswordSuccess(''), 4000);
-    } catch (err) {
-      setPasswordError('Beklenmeyen hata: ' + (err as Error).message);
-    } finally {
+    if (signInErr) {
       setChangingPassword(false);
+      setPasswordError('Current password is incorrect. Please check and try again.');
+      return;
     }
+
+    // Update password
+    const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+
+    setChangingPassword(false);
+
+    if (updateErr) {
+      setPasswordError('Password could not be updated. Please try again.');
+      return;
+    }
+
+    setPasswordSuccess('Your password has been updated successfully.');
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setTimeout(() => setPasswordSuccess(''), 4000);
   }
 
   // ── Phone save ────────────────────────────────────────────────────────────

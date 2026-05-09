@@ -75,67 +75,65 @@ export default function ProductsPage({ onNavigate }: Props) {
     setBuying(product.id);
     setFeedback(null);
 
-    try {
-      const endDate = new Date();
-      endDate.setTime(endDate.getTime() + product.duration_days * 24 * 60 * 60 * 1000);
-      const effectiveRate = hasReferralBonus ? product.profit_rate + 10 : product.profit_rate;
-      const profitAmount = product.daily_profit != null
-        ? Number(product.daily_profit) * product.duration_days
-        : (product.price * effectiveRate) / 100;
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + product.duration_days);
+    const effectiveRate = hasReferralBonus ? product.profit_rate + 10 : product.profit_rate;
+    const profitAmount = (product.price * effectiveRate) / 100;
 
-      const { error: invError } = await supabase.from('investments').insert({
-        user_id: user.id,
-        product_id: product.id,
-        amount: product.price,
-        profit_rate: effectiveRate,
-        profit_amount: profitAmount,
-        end_date: endDate.toISOString(),
-        status: 'active',
-      });
+    const { error: invError } = await supabase.from('investments').insert({
+      user_id: user.id,
+      product_id: product.id,
+      amount: product.price,
+      profit_rate: effectiveRate,
+      profit_amount: profitAmount,
+      end_date: endDate.toISOString(),
+      status: 'active',
+    });
 
-      if (invError) {
-        setFeedback({ id: product.id, ok: false, msg: 'Could not create investment. Please try again.' });
-        return;
-      }
-
-      const { error: balError } = await supabase
-        .from('profiles')
-        .update({ balance: profile.balance - product.price })
-        .eq('id', user.id);
-
-      if (balError) {
-        setFeedback({ id: product.id, ok: false, msg: 'Investment recorded but balance update failed. Please refresh.' });
-        return;
-      }
-
-      await supabase.from('transactions').insert({
-        user_id: user.id,
-        type: 'investment',
-        amount: product.price,
-        status: 'completed',
-        description: `${product.name} yatirimi`,
-      });
-
-      const { data: invData } = await supabase
-        .from('investments')
-        .select('*, products(*)')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-      if (invData) {
-        setActiveInvestments(
-          (invData as ActiveInvestmentWithProduct[]).filter((inv) => inv.products != null)
-        );
-      }
-
-      await refreshProfile();
-      setFeedback({ id: product.id, ok: true, msg: 'Yatirim basariyla tamamlandi!' });
-      setTimeout(() => setFeedback(null), 4000);
-    } catch (err) {
-      setFeedback({ id: product.id, ok: false, msg: 'Beklenmeyen hata: ' + (err as Error).message });
-    } finally {
+    if (invError) {
+      setFeedback({ id: product.id, ok: false, msg: 'Could not create investment. Please try again.' });
       setBuying(null);
+      setTimeout(() => setFeedback(null), 3500);
+      return;
     }
+
+    const { error: balError } = await supabase
+      .from('profiles')
+      .update({ balance: profile.balance - product.price })
+      .eq('id', user.id);
+
+    if (balError) {
+      setFeedback({ id: product.id, ok: false, msg: 'Investment recorded but balance update failed. Please refresh.' });
+      setBuying(null);
+      setTimeout(() => setFeedback(null), 4000);
+      return;
+    }
+
+    await supabase.from('transactions').insert({
+      user_id: user.id,
+      type: 'investment',
+      amount: product.price,
+      status: 'completed',
+      description: `${product.name} investment`,
+    });
+
+    // Refresh investments list then profile — order matters to avoid stale balance flash
+    const { data: invData } = await supabase
+      .from('investments')
+      .select('*, products(*)')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+    if (invData) {
+      setActiveInvestments(
+        (invData as ActiveInvestmentWithProduct[]).filter((inv) => inv.products != null)
+      );
+    }
+
+    await refreshProfile();
+    setBuying(null);
+    setFeedback({ id: product.id, ok: true, msg: 'Investment completed successfully!' });
+    setTimeout(() => setFeedback(null), 4000);
   }
 
   async function handleEarlyWithdraw() {
@@ -324,10 +322,7 @@ export default function ProductsPage({ onNavigate }: Props) {
                   const effectiveRate = hasReferralBonus ? product.profit_rate + 10 : product.profit_rate;
                   const badge = tierLabel(effectiveRate);
                   const img = product.image_url || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
-                  const profitEarnings = product.daily_profit != null
-                    ? Number(product.daily_profit) * product.duration_days
-                    : (product.price * effectiveRate) / 100;
-                  const totalReturn = product.price + profitEarnings;
+                  const totalReturn = product.price + (product.price * effectiveRate) / 100;
 
                   return (
                     <div
@@ -396,7 +391,7 @@ export default function ProductsPage({ onNavigate }: Props) {
                           </div>
                           <div className="bg-gray-800/60 rounded-xl p-2.5 text-center">
                             <div className="text-amber-400 font-bold text-sm">
-                              +${profitEarnings.toFixed(2)}
+                              ${((product.price * effectiveRate) / 100).toFixed(0)}
                             </div>
                             <div className="text-gray-600 text-xs mt-0.5">Earnings</div>
                           </div>
@@ -459,7 +454,7 @@ export default function ProductsPage({ onNavigate }: Props) {
                               ) : (
                                 <>
                                   <ShoppingCart size={15} />
-                                  Add to Shelf
+                                  Buy Now
                                 </>
                               )}
                             </button>
