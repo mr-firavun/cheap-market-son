@@ -70,29 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string, fullName: string, referralCode?: string) {
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            referral_code: referralCode ? referralCode.trim().toUpperCase() : '',
+          },
+        },
+      });
       if (error) return { error };
-
-      if (data.user) {
-        let referredById: string | null = null;
-        if (referralCode) {
-          const { data: refProfile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('referral_code', referralCode)
-            .maybeSingle();
-          if (refProfile) {
-            referredById = (refProfile as { id: string }).id;
-          }
-        }
-
-        await supabase.from('profiles').upsert({
-          id: data.user.id,
-          email,
-          full_name: fullName,
-          referred_by: referredById,
-        });
-      }
 
       // No session means email confirmation is required
       if (!data.session) {

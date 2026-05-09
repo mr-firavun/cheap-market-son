@@ -209,10 +209,61 @@ export default function AdminTabs({
         const { error } = await supabase.from('profiles').update({ balance: val }).eq('id', editBalance.userId);
         if (error) throw error;
         setUsers((u) => u.map((usr) => usr.id === editBalance!.userId ? { ...usr, balance: val } : usr));
-        await supabase.from('transactions').insert({
+        const { data: insertedTx } = await supabase.from('transactions').insert({
           user_id: editBalance.userId, type: 'deposit', amount: val,
           status: 'completed', description: 'Admin bakiye guncellemesi',
-        });
+        }).select('id').maybeSingle();
+
+        // Referral reward: if deposit >= 200 and referrer not yet rewarded
+        if (val >= 200 && insertedTx) {
+          const { data: depositorProfile } = await supabase
+            .from('profiles')
+            .select('referred_by, referral_first_deposit_rewarded')
+            .eq('id', editBalance.userId)
+            .maybeSingle();
+
+          if (
+            depositorProfile &&
+            depositorProfile.referred_by &&
+            !depositorProfile.referral_first_deposit_rewarded
+          ) {
+            const referrerId = depositorProfile.referred_by;
+            const REFERRAL_REWARD = 15;
+            const { data: referrerProfile } = await supabase
+              .from('profiles')
+              .select('balance')
+              .eq('id', referrerId)
+              .maybeSingle();
+
+            if (referrerProfile) {
+              await supabase
+                .from('profiles')
+                .update({ balance: Number(referrerProfile.balance) + REFERRAL_REWARD })
+                .eq('id', referrerId);
+
+              await supabase.from('transactions').insert({
+                user_id: referrerId,
+                type: 'referral_bonus',
+                amount: REFERRAL_REWARD,
+                status: 'completed',
+                notes: 'Referans odulu - davet ettigi kullanici ilk 200$+ yatirimi yapti',
+                reference_id: insertedTx.id,
+              });
+
+              await supabase.from('notifications').insert({
+                user_id: referrerId,
+                title: 'Referans Odulu Kazandiniz!',
+                message: `Davet ettiginiz kullanici ilk 200$+ yatirimini yapti. $${REFERRAL_REWARD.toFixed(2)} USDT bakiyenize eklendi.`,
+                type: 'referral_bonus',
+              });
+
+              await supabase
+                .from('profiles')
+                .update({ referral_first_deposit_rewarded: true })
+                .eq('id', editBalance.userId);
+            }
+          }
+        }
       }
       setEditBalance(null);
     } catch (err) {
