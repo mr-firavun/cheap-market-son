@@ -33,6 +33,7 @@ type EditUser = {
   phone_number: string;
   wallet_address: string;
   is_admin: boolean;
+  referred_by_code: string;
 };
 
 type InvestmentWithUser = Investment & {
@@ -277,12 +278,34 @@ export default function AdminTabs({
     if (!editUser) return;
     setSavingUser(true);
     try {
-      const { error } = await supabase.from('profiles').update({
+      let referredById: string | null = null;
+      if (editUser.referred_by_code.trim()) {
+        const { data: referrer } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('referral_code', editUser.referred_by_code.trim().toUpperCase())
+          .neq('id', editUser.userId)
+          .maybeSingle();
+        if (!referrer) {
+          alert('Referans kodu bulunamadi: ' + editUser.referred_by_code.trim().toUpperCase());
+          setSavingUser(false);
+          return;
+        }
+        referredById = referrer.id;
+      }
+
+      const updatePayload: Record<string, unknown> = {
         full_name: editUser.full_name,
         phone_number: editUser.phone_number,
         wallet_address: editUser.wallet_address,
         is_admin: editUser.is_admin,
-      }).eq('id', editUser.userId);
+      };
+      if (editUser.referred_by_code.trim() !== '') {
+        updatePayload.referred_by = referredById;
+        updatePayload.referral_first_deposit_rewarded = false;
+      }
+
+      const { error } = await supabase.from('profiles').update(updatePayload).eq('id', editUser.userId);
       if (error) throw error;
       setUsers((prev) => prev.map((u) => u.id === editUser.userId ? {
         ...u,
@@ -290,6 +313,7 @@ export default function AdminTabs({
         phone_number: editUser.phone_number,
         wallet_address: editUser.wallet_address,
         is_admin: editUser.is_admin,
+        ...(editUser.referred_by_code.trim() !== '' ? { referred_by: referredById, referral_first_deposit_rewarded: false } : {}),
       } : u));
       setEditUser(null);
     } catch (err) {
@@ -300,12 +324,14 @@ export default function AdminTabs({
   }
 
   function startEditUser(u: UserWithStats) {
+    const referrer = u.referred_by ? users.find((x) => x.id === u.referred_by) : null;
     setEditUser({
       userId: u.id,
       full_name: u.full_name,
       phone_number: u.phone_number || '',
       wallet_address: u.wallet_address || '',
       is_admin: u.is_admin,
+      referred_by_code: referrer?.referral_code || '',
     });
   }
 
@@ -559,6 +585,17 @@ export default function AdminTabs({
                   onChange={(e) => setEditUser({ ...editUser, wallet_address: e.target.value })}
                   placeholder="T..."
                   className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-amber-500/50" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                  Referans Sahibinin Kodu
+                  <span className="text-gray-600 font-normal ml-1">(bos birakılırsa degismez)</span>
+                </label>
+                <input type="text" value={editUser.referred_by_code}
+                  onChange={(e) => setEditUser({ ...editUser, referred_by_code: e.target.value.toUpperCase() })}
+                  placeholder="Ornek: A1B2C3D4"
+                  className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-amber-500/50" />
+                <p className="text-xs text-gray-600 mt-1">Referans kodu girilirse bu kullanicinin referans_first_deposit_rewarded sifirlanir ve tekrar odül alinabilir.</p>
               </div>
               <div className="flex items-center justify-between bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3">
                 <div>
