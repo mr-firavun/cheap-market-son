@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Gift, AlertCircle, KeyRound, ArrowLeft, CheckCircle, MailCheck, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Gift, AlertCircle, KeyRound, ArrowLeft, CheckCircle, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import logoSrc from '../assets/logo.jpeg';
@@ -9,10 +9,22 @@ type Props = {
   initialMode?: 'login' | 'register' | 'forgot' | 'reset';
 };
 
-type Mode = 'login' | 'register' | 'forgot' | 'verify-code' | 'reset-password' | 'email-confirmation' | 'verify-email';
+type Mode = 'login' | 'register' | 'forgot' | 'verify-code' | 'reset-password' | 'email-confirmation' | 'captcha';
 
 function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function generateMathQuestion(): { question: string; answer: number } {
+  const ops = ['+', '-', '*'] as const;
+  const op = ops[Math.floor(Math.random() * ops.length)];
+  let a: number, b: number;
+  if (op === '+') { a = Math.floor(Math.random() * 20) + 1; b = Math.floor(Math.random() * 20) + 1; }
+  else if (op === '-') { a = Math.floor(Math.random() * 20) + 10; b = Math.floor(Math.random() * 10) + 1; }
+  else { a = Math.floor(Math.random() * 9) + 2; b = Math.floor(Math.random() * 9) + 2; }
+  const answer = op === '+' ? a + b : op === '-' ? a - b : a * b;
+  const symbol = op === '*' ? '×' : op;
+  return { question: `${a} ${symbol} ${b} = ?`, answer };
 }
 
 export default function AuthPage({ onNavigate, initialMode }: Props) {
@@ -36,11 +48,10 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [pendingResetEmail, setPendingResetEmail] = useState('');
 
-  // Email verification flow (signup)
-  const [emailVerifyCode, setEmailVerifyCode] = useState('');
-  const [emailVerifyError, setEmailVerifyError] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [generatedCode, setGeneratedCode] = useState('');
+  // Captcha (signup anti-bot)
+  const [captcha, setCaptcha] = useState<{ question: string; answer: number } | null>(null);
+  const [captchaInput, setCaptchaInput] = useState('');
+  const [captchaError, setCaptchaError] = useState('');
 
   useEffect(() => {
     // Pre-fill referral code from URL
@@ -48,12 +59,6 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
     const ref = params.get('ref');
     if (ref) setForm((p) => ({ ...p, referralCode: ref }));
   }, []);
-
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [resendCooldown]);
 
   function isValidEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
@@ -105,75 +110,32 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
     } else {
       if (!form.fullName.trim()) { setError('Full name is required.'); setLoading(false); return; }
       if (form.password.length < 6) { setError('Password must be at least 6 characters.'); setLoading(false); return; }
-      const { error, emailVerificationRequired, code } = await signUp(form.email, form.password, form.fullName, form.referralCode || undefined);
       setLoading(false);
-      if (error) {
-        setError('Could not send verification email. Please try again.');
-      } else if (emailVerificationRequired) {
-        setEmailVerifyCode('');
-        setEmailVerifyError('');
-        setResendCooldown(60);
-        if (code) setGeneratedCode(code);
-        setMode('verify-email');
-      } else {
-        onNavigate('dashboard');
-      }
+      setCaptcha(generateMathQuestion());
+      setCaptchaInput('');
+      setCaptchaError('');
+      setMode('captcha');
     }
   }
 
-  async function handleEmailVerify(e: React.FormEvent) {
+  async function handleCaptchaSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setEmailVerifyError('');
-    if (emailVerifyCode.length < 6) { setEmailVerifyError('Please enter the 6-digit code.'); return; }
-    setLoading(true);
-
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    // Verify the code first
-    const verifyRes = await fetch(`${supabaseUrl}/functions/v1/verify-email-code`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-      body: JSON.stringify({ email: form.email.trim().toLowerCase(), code: emailVerifyCode.trim() }),
-    });
-    const verifyJson = await verifyRes.json();
-
-    if (!verifyRes.ok) {
-      setLoading(false);
-      setEmailVerifyError(verifyJson.error ?? 'Invalid code. Please try again.');
+    setCaptchaError('');
+    if (!captcha) return;
+    if (parseInt(captchaInput, 10) !== captcha.answer) {
+      setCaptchaError('Wrong answer. Please try again.');
+      setCaptcha(generateMathQuestion());
+      setCaptchaInput('');
       return;
     }
-
-    // Code verified — create the actual account
+    setLoading(true);
     const { error } = await completeSignUp(form.email, form.password, form.fullName, form.referralCode || undefined);
     setLoading(false);
     if (error) {
-      setEmailVerifyError('Registration failed. This email may already be in use.');
+      setCaptchaError('Registration failed. This email may already be in use.');
       return;
     }
     onNavigate('dashboard');
-  }
-
-  async function handleResendEmailCode() {
-    if (resendCooldown > 0) return;
-    setEmailVerifyError('');
-    setLoading(true);
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const res = await fetch(`${supabaseUrl}/functions/v1/send-verification-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-      body: JSON.stringify({ email: form.email.trim().toLowerCase() }),
-    });
-    setLoading(false);
-    if (res.ok) {
-      const json = await res.json();
-      setResendCooldown(60);
-      setEmailVerifyCode('');
-      if (json.code) setGeneratedCode(json.code);
-    } else {
-      setEmailVerifyError('Could not resend code. Please try again.');
-    }
   }
 
   async function handleForgotSubmit(e: React.FormEvent) {
@@ -409,101 +371,56 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
             </>
           )}
 
-          {/* ── EMAIL VERIFICATION (signup) ── */}
-          {mode === 'verify-email' && (
+          {/* ── CAPTCHA (robot check) ── */}
+          {mode === 'captcha' && captcha && (
             <div className="py-2">
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <ShieldCheck size={28} className="text-amber-400" />
+                  <Bot size={28} className="text-amber-400" />
                 </div>
-                <h2 className="font-bold text-xl mb-1">Verify Your Email</h2>
-                <p className="text-gray-400 text-sm">We sent a 6-digit code to</p>
-                <p className="text-amber-400 font-semibold text-sm mt-1 break-all">{form.email}</p>
+                <h2 className="font-bold text-xl mb-1">Robot Musunuz?</h2>
+                <p className="text-gray-400 text-sm">Devam etmek için aşağıdaki soruyu cevaplayın.</p>
               </div>
 
-              {generatedCode && (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-4 text-center">
-                  <p className="text-xs text-amber-400/70 mb-1">Your verification code</p>
-                  <p className="text-3xl font-mono font-bold tracking-widest text-amber-400">{generatedCode}</p>
+              <form onSubmit={handleCaptchaSubmit} className="space-y-5">
+                <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-5 text-center">
+                  <p className="text-xs text-gray-500 mb-2 uppercase tracking-widest">Matematik Sorusu</p>
+                  <p className="text-3xl font-bold text-white">{captcha.question}</p>
                 </div>
-              )}
 
-              <form onSubmit={handleEmailVerify} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Verification Code</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Cevabınız</label>
                   <input
-                    type="text"
-                    inputMode="numeric"
-                    value={emailVerifyCode}
-                    onChange={(e) => { setEmailVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setEmailVerifyError(''); }}
-                    placeholder="000000"
-                    maxLength={6}
+                    type="number"
+                    value={captchaInput}
+                    onChange={(e) => { setCaptchaInput(e.target.value); setCaptchaError(''); }}
+                    placeholder="Cevabı girin"
                     autoFocus
-                    className="w-full bg-gray-800/60 border border-gray-700 text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-center text-3xl font-mono tracking-widest focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30 transition-all"
+                    className="w-full bg-gray-800/60 border border-gray-700 text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-center text-2xl font-mono focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30 transition-all"
                     required
                   />
                 </div>
 
-                {emailVerifyError && (
+                {captchaError && (
                   <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 flex items-center gap-2 text-sm text-red-400">
-                    <AlertCircle size={14} className="shrink-0" /> {emailVerifyError}
+                    <AlertCircle size={14} className="shrink-0" /> {captchaError}
                   </div>
                 )}
 
-                <button type="submit" disabled={loading || emailVerifyCode.length < 6}
+                <button type="submit" disabled={loading || !captchaInput}
                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40">
                   {loading
                     ? <div className="w-5 h-5 border-2 border-gray-950/30 border-t-gray-950 rounded-full animate-spin" />
-                    : <>Verify & Create Account <ArrowRight size={16} /></>}
+                    : <>Hesap Oluştur <ArrowRight size={16} /></>}
                 </button>
               </form>
-
-              <div className="mt-5 text-center">
-                <p className="text-xs text-gray-500 mb-2">Didn't receive the code? Check your spam folder.</p>
-                <button
-                  type="button"
-                  onClick={handleResendEmailCode}
-                  disabled={resendCooldown > 0 || loading}
-                  className="text-sm font-medium text-amber-400 hover:text-amber-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
-                >
-                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
-                </button>
-              </div>
 
               <button
                 type="button"
                 onClick={() => switchAuthMode('register')}
                 className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 text-sm text-gray-500 hover:text-gray-300 transition-colors"
               >
-                <ArrowLeft size={14} /> Back to Register
-              </button>
-            </div>
-          )}
-
-          {/* ── EMAIL CONFIRMATION ── */}
-          {mode === 'email-confirmation' && (
-            <div className="text-center py-4">
-              <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-5">
-                <MailCheck size={28} className="text-amber-400" />
-              </div>
-              <h2 className="font-bold text-xl mb-2">Check Your Email</h2>
-              <p className="text-gray-400 text-sm leading-relaxed mb-2">
-                We sent a confirmation link to
-              </p>
-              <p className="text-amber-400 font-semibold text-sm mb-4 break-all">{form.email}</p>
-              <p className="text-gray-500 text-xs leading-relaxed mb-6">
-                Click the link in your email to verify your account. Once verified, you can sign in.
-              </p>
-              <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-4 mb-5 text-left">
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  <span className="text-gray-300 font-medium">Didn't receive it?</span> Check your spam folder. The link expires after 24 hours.
-                </p>
-              </div>
-              <button
-                onClick={() => switchAuthMode('login')}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl transition-all text-sm border border-gray-700"
-              >
-                Back to Sign In
+                <ArrowLeft size={14} /> Geri Dön
               </button>
             </div>
           )}
