@@ -7,7 +7,8 @@ type AuthContextType = {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<{ error: Error | null; emailConfirmationRequired?: boolean }>;
+  signUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<{ error: Error | null; emailVerificationRequired?: boolean }>;
+  completeSignUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -68,7 +69,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  async function signUp(email: string, password: string, fullName: string, referralCode?: string) {
+  async function signUp(email: string, _password: string, _fullName: string, _referralCode?: string) {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-verification-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const json = await res.json();
+      if (!res.ok) return { error: new Error(json.error ?? 'Failed to send verification email') };
+      return { error: null, emailVerificationRequired: true };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  }
+
+  async function completeSignUp(email: string, password: string, fullName: string, referralCode?: string) {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -81,12 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
       if (error) return { error };
-
-      // No session means email confirmation is required
       if (!data.session) {
-        return { error: null, emailConfirmationRequired: true };
+        // Supabase email confirmation is enabled — treat as success anyway
+        return { error: null };
       }
-
       return { error: null };
     } catch (err) {
       return { error: err as Error };
@@ -103,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signUp, completeSignUp, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
