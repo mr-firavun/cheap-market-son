@@ -7,7 +7,7 @@ type AuthContextType = {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<{ error: Error | null; emailVerificationRequired?: boolean }>;
+  signUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<{ error: Error | null; emailVerificationRequired?: boolean; code?: string }>;
   completeSignUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const json = await res.json();
       if (!res.ok) return { error: new Error(json.error ?? 'Failed to send verification email') };
-      return { error: null, emailVerificationRequired: true };
+      return { error: null, emailVerificationRequired: true, code: json.code };
     } catch (err) {
       return { error: err as Error };
     }

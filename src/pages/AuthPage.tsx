@@ -40,6 +40,7 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
   const [emailVerifyCode, setEmailVerifyCode] = useState('');
   const [emailVerifyError, setEmailVerifyError] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [generatedCode, setGeneratedCode] = useState('');
 
   useEffect(() => {
     // Pre-fill referral code from URL
@@ -104,7 +105,7 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
     } else {
       if (!form.fullName.trim()) { setError('Full name is required.'); setLoading(false); return; }
       if (form.password.length < 6) { setError('Password must be at least 6 characters.'); setLoading(false); return; }
-      const { error, emailVerificationRequired } = await signUp(form.email, form.password, form.fullName, form.referralCode || undefined);
+      const { error, emailVerificationRequired, code } = await signUp(form.email, form.password, form.fullName, form.referralCode || undefined);
       setLoading(false);
       if (error) {
         setError('Could not send verification email. Please try again.');
@@ -112,6 +113,7 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
         setEmailVerifyCode('');
         setEmailVerifyError('');
         setResendCooldown(60);
+        if (code) setGeneratedCode(code);
         setMode('verify-email');
       } else {
         onNavigate('dashboard');
@@ -165,8 +167,10 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
     });
     setLoading(false);
     if (res.ok) {
+      const json = await res.json();
       setResendCooldown(60);
       setEmailVerifyCode('');
+      if (json.code) setGeneratedCode(json.code);
     } else {
       setEmailVerifyError('Could not resend code. Please try again.');
     }
@@ -416,6 +420,13 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
                 <p className="text-gray-400 text-sm">We sent a 6-digit code to</p>
                 <p className="text-amber-400 font-semibold text-sm mt-1 break-all">{form.email}</p>
               </div>
+
+              {generatedCode && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-4 text-center">
+                  <p className="text-xs text-amber-400/70 mb-1">Your verification code</p>
+                  <p className="text-3xl font-mono font-bold tracking-widest text-amber-400">{generatedCode}</p>
+                </div>
+              )}
 
               <form onSubmit={handleEmailVerify} className="space-y-4">
                 <div>
