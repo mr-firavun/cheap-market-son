@@ -15,16 +15,9 @@ function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-function generateMathQuestion(): { question: string; answer: number } {
-  const ops = ['+', '-', '*'] as const;
-  const op = ops[Math.floor(Math.random() * ops.length)];
-  let a: number, b: number;
-  if (op === '+') { a = Math.floor(Math.random() * 20) + 1; b = Math.floor(Math.random() * 20) + 1; }
-  else if (op === '-') { a = Math.floor(Math.random() * 20) + 10; b = Math.floor(Math.random() * 10) + 1; }
-  else { a = Math.floor(Math.random() * 9) + 2; b = Math.floor(Math.random() * 9) + 2; }
-  const answer = op === '+' ? a + b : op === '-' ? a - b : a * b;
-  const symbol = op === '*' ? '×' : op;
-  return { question: `${a} ${symbol} ${b} = ?`, answer };
+function generateCaptchaCode(): { code: string } {
+  const code = Math.floor(1000 + Math.random() * 9000).toString();
+  return { code };
 }
 
 export default function AuthPage({ onNavigate, initialMode }: Props) {
@@ -49,7 +42,7 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
   const [pendingResetEmail, setPendingResetEmail] = useState('');
 
   // Captcha (signup anti-bot)
-  const [captcha, setCaptcha] = useState<{ question: string; answer: number } | null>(null);
+  const [captcha, setCaptcha] = useState<{ code: string } | null>(null);
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaError, setCaptchaError] = useState('');
 
@@ -111,7 +104,7 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
       if (!form.fullName.trim()) { setError('Full name is required.'); setLoading(false); return; }
       if (form.password.length < 6) { setError('Password must be at least 6 characters.'); setLoading(false); return; }
       setLoading(false);
-      setCaptcha(generateMathQuestion());
+      setCaptcha(generateCaptchaCode());
       setCaptchaInput('');
       setCaptchaError('');
       setMode('captcha');
@@ -122,9 +115,9 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
     e.preventDefault();
     setCaptchaError('');
     if (!captcha) return;
-    if (parseInt(captchaInput, 10) !== captcha.answer) {
-      setCaptchaError('Wrong answer. Please try again.');
-      setCaptcha(generateMathQuestion());
+    if (captchaInput.trim() !== captcha.code) {
+      setCaptchaError('Kod hatalı. Lütfen tekrar deneyin.');
+      setCaptcha(generateCaptchaCode());
       setCaptchaInput('');
       return;
     }
@@ -379,24 +372,32 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
                   <Bot size={28} className="text-amber-400" />
                 </div>
                 <h2 className="font-bold text-xl mb-1">Robot Musunuz?</h2>
-                <p className="text-gray-400 text-sm">Devam etmek için aşağıdaki soruyu cevaplayın.</p>
+                <p className="text-gray-400 text-sm">Aşağıdaki kodu girerek devam edin.</p>
               </div>
 
               <form onSubmit={handleCaptchaSubmit} className="space-y-5">
-                <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-5 text-center">
-                  <p className="text-xs text-gray-500 mb-2 uppercase tracking-widest">Matematik Sorusu</p>
-                  <p className="text-3xl font-bold text-white">{captcha.question}</p>
+                <div className="bg-gray-800/60 border border-amber-500/20 rounded-2xl p-6 text-center select-none">
+                  <p className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Güvenlik Kodu</p>
+                  <div className="flex items-center justify-center gap-2">
+                    {captcha.code.split('').map((digit, i) => (
+                      <span key={i} className="w-12 h-14 flex items-center justify-center bg-gray-900 border border-gray-600 rounded-xl text-3xl font-mono font-bold text-amber-400 shadow-inner">
+                        {digit}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Cevabınız</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Kodu girin</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={captchaInput}
-                    onChange={(e) => { setCaptchaInput(e.target.value); setCaptchaError(''); }}
-                    placeholder="Cevabı girin"
+                    onChange={(e) => { setCaptchaInput(e.target.value.replace(/\D/g, '').slice(0, 4)); setCaptchaError(''); }}
+                    placeholder="_ _ _ _"
+                    maxLength={4}
                     autoFocus
-                    className="w-full bg-gray-800/60 border border-gray-700 text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-center text-2xl font-mono focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30 transition-all"
+                    className="w-full bg-gray-800/60 border border-gray-700 text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-center text-3xl font-mono tracking-widest focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30 transition-all"
                     required
                   />
                 </div>
@@ -407,7 +408,7 @@ export default function AuthPage({ onNavigate, initialMode }: Props) {
                   </div>
                 )}
 
-                <button type="submit" disabled={loading || !captchaInput}
+                <button type="submit" disabled={loading || captchaInput.length < 4}
                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40">
                   {loading
                     ? <div className="w-5 h-5 border-2 border-gray-950/30 border-t-gray-950 rounded-full animate-spin" />
